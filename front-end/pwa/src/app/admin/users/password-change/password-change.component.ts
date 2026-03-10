@@ -20,20 +20,19 @@ export class PasswordChangeComponent {
     private userService: UsersService,) {
   }
 
-  public openDialog(userId: number, userEmail: string): void {
+  public showDialog(userId: number, userEmail: string): void {
     this.userId = userId;
     this.userEmail = userEmail;
     this.open = true;
   }
 
   protected onOkClick(): void {
-
-    if (this.newPassword === "") {
+    if (this.newPassword === '') {
       this.pagesDataService.showToast({ title: "Password Change", message: `Empty passwords not allowed`, type: ToastEventTypeEnum.ERROR });
       return;
     }
 
-    if (this.confirmPassword === "") {
+    if (this.confirmPassword === '') {
       this.pagesDataService.showToast({ title: "Password Change", message: `Password NOT confirmed`, type: ToastEventTypeEnum.ERROR });
       return;
     }

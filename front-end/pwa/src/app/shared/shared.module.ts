@@ -3,6 +3,7 @@ import { NgModule } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule, ReactiveFormsModule } from '@angular/forms';
 import { HttpClientModule } from '@angular/common/http';
+import { DragDropModule } from '@angular/cdk/drag-drop';
 //--------------------------------
 
 //--------- components ------------
@@ -16,32 +17,36 @@ import { ToggleChevronComponent } from './controls/toggle-chevron/toggle-chevron
 import { InputDialogComponent } from './controls/input-dialog/input-dialog.component';
 import { SimulateTabOnEnterDirective } from '../shared/simulate-tab-on-enter.directive';
 import { CloseDropDownDirective } from './close-drop-down.directive';
+import { SortableHeaderDirective } from './sortable-header.directive';
 import { YearMonthInputComponent } from './controls/year-month-input/year-month-input.component';
 import { SelectorMultipleInputComponent } from './controls/selector-input/selector-multiple-input/selector-multiple-input.component';
 import { SelectorSingleInputComponent } from './controls/selector-input/selector-single-input/selector-single-input.component';
 
 import { HourSingleInputComponent } from './controls/hour-input/hour-single-input/hour-single-input.component';
 import { HourMultipleInputComponent } from './controls/hour-input/hour-multiple-input/hour-multiple-input.component';
-import { IntervalSelectorSingleComponent } from './controls/period-input/interval-selector-single/interval-selector-single.component';
+import { IntervalSelectorSingleComponent } from './controls/interval-selector/interval-selector-single/interval-selector-single.component';
 import { LabelInputComponent } from './controls/label-input/label-input.component';
 import { DropDownButtonComponent } from './controls/drop-down-button/drop-down-button.component';
-import { ElementDomainSingleInputComponent } from './controls/element-domain-input/element-domain-single-input/element-domain-single-input.component';
-import { ElementSubdomainSingleInputComponent } from './controls/element-subdomain-input/element-subdomain-single-input/element-subdomain-single-input.component';
 import { CheckBoxInputComponent } from './controls/check-box-input/check-box-input.component';
 import { RadioButtonsInputComponent } from './controls/radio-buttons-input/radio-buttons-input.component';
-import { ServerTypeInputComponent } from './controls/server-type-input/server-type-input.component';
 import { FlagSingleInputComponent } from './controls/flag-input/flag-single-input/flag-single-input.component';
 import { PageInputComponent } from './controls/page-input/page-input.component';
 import { DropDownContainerComponent } from './controls/drop-down-container/drop-down-container.component';
 import { MapComponent } from './controls/map/map.component';
 import { DataStructureInputComponent } from './controls/data-structure-input/data-structure-input.component';
 import { DateRangeInputComponent } from './controls/date-range-input/date-range-input.component';
-import { IntervalSelectorMultipleComponent } from './controls/period-input/interval-selector-multiple/interval-selector-multiple.component';
+import { IntervalSelectorMultipleComponent } from './controls/interval-selector/interval-selector-multiple/interval-selector-multiple.component';
 import { YearSelectorMultipleComponent } from './controls/year-selector/year-selector-multiple/year-selector-multiple.component';
 import { YearSelectorSingleComponent } from './controls/year-selector/year-selector-single-input/year-selector-single.component';
 import { DatetimeFormatSelectorSingleComponent } from './controls/datetime-format-selectors/datetime-format-selector-single/datetime-format-selector-single.component';
 import { TimeFormatSelectorSingleComponent } from './controls/datetime-format-selectors/time-format-selector-single/time-format-selector-single.component';
 import { DateFormatSelectorSingleComponent } from './controls/datetime-format-selectors/date-format-selector-single/date-format-selector-single.component';
+import { ErrorSelectorSingleComponent } from './controls/error-selector-single/error-selector-single.component';
+import { CronInputComponent } from './controls/cron-input/cron-input.component';
+import { DeleteConfirmationDialogComponent } from './controls/delete-confirmation-dialog/delete-confirmation-dialog.component';
+import { ToggleDisabledConfirmationDialogComponent } from './controls/toggle-disabled-confirmation-dialog/toggle-disabled-confirmation-dialog.component';
+import { FileInputComponent } from './controls/file-input/file-input.component';
+import { DelimeterSelectorComponent } from './controls/delimeter-selector/delimeter-selector.component';
 
 //--------------------------------
 
@@ -50,6 +55,7 @@ const angularModules = [
   ReactiveFormsModule,
   FormsModule,
   HttpClientModule,
+  DragDropModule,
 ];
 
 //--------------------------------
@@ -77,9 +83,6 @@ const controlsComponents = [
   IntervalSelectorSingleComponent,
 
   DropDownButtonComponent,
-  ElementDomainSingleInputComponent,
-  ElementSubdomainSingleInputComponent,
-  ServerTypeInputComponent,
   FlagSingleInputComponent,
   PageInputComponent,
   DropDownContainerComponent,
@@ -96,11 +99,19 @@ const controlsComponents = [
   DatetimeFormatSelectorSingleComponent,
   DateFormatSelectorSingleComponent,
   TimeFormatSelectorSingleComponent,
+
+  ErrorSelectorSingleComponent,
+  CronInputComponent,
+  DeleteConfirmationDialogComponent,
+  ToggleDisabledConfirmationDialogComponent,
+  FileInputComponent,
+  DelimeterSelectorComponent,
 ];
 
 const directives = [
   SimulateTabOnEnterDirective,
   CloseDropDownDirective,
+  SortableHeaderDirective,
 ]
 
 @NgModule({

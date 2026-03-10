@@ -1,4 +1,4 @@
-import { Component, OnInit, Input, Output, EventEmitter, SimpleChanges, OnChanges, OnDestroy } from '@angular/core';
+import { Component, Input, Output, EventEmitter, SimpleChanges, OnChanges, OnDestroy } from '@angular/core';
 import { Subject, takeUntil } from 'rxjs';
 import { ElementCacheModel, ElementsCacheService } from '../../services/elements-cache.service';
 
@@ -26,12 +26,18 @@ export class ElementSelectorSingleComponent implements OnChanges, OnDestroy {
       takeUntil(this.destroy$),
     ).subscribe(data => {
       this.allElements = data;
-      this.filterBasedOnSelectedIds();
+      this.setElementsToInclude();
+      this.setSelected();
     });
   }
 
   ngOnChanges(changes: SimpleChanges): void {
-    this.filterBasedOnSelectedIds();
+    if (changes['includeOnlyIds']) {
+      this.setElementsToInclude();
+    }
+    if (changes['selectedId']) {
+      this.setSelected();
+    }
   }
 
   ngOnDestroy() {
@@ -39,14 +45,15 @@ export class ElementSelectorSingleComponent implements OnChanges, OnDestroy {
     this.destroy$.complete();
   }
 
-  private filterBasedOnSelectedIds(): void {
-    this.elements = this.allElements;
-    if (this.includeOnlyIds && this.includeOnlyIds.length > 0) {
-      this.elements = this.elements.filter(item => this.includeOnlyIds.includes(item.id));
-    }
+  private setElementsToInclude(): void {
+    this.elements = this.includeOnlyIds && this.includeOnlyIds.length > 0 ? this.allElements.filter(item => this.includeOnlyIds.includes(item.id)) : this.allElements;
+  }
 
-    const foundElement = this.elements.find(data => data.id === this.selectedId);
-    this.selectedElement = foundElement ? foundElement : null;
+  private setSelected(): void {
+    if (this.selectedId) {
+      const found = this.elements.find(data => data.id === this.selectedId);
+      this.selectedElement = found ? found : null;
+    }
   }
 
   protected optionDisplayFunction(option: ElementCacheModel): string {

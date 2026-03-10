@@ -1,22 +1,22 @@
-import { Body, Controller, Delete, FileTypeValidator, Get, Header, MaxFileSizeValidator, Param, ParseArrayPipe, ParseFilePipe, Patch, Post, Put, Query, Req, UploadedFile, UseInterceptors } from '@nestjs/common';
+import { Body, Controller, Delete, FileTypeValidator, Get, MaxFileSizeValidator, Param, ParseArrayPipe, ParseFilePipe, Patch, Post, Put, Query, Req, UploadedFile, UseInterceptors } from '@nestjs/common';
 import { ObservationsService } from '../services/observations.service';
 import { CreateObservationDto } from '../dtos/create-observation.dto';
 import { ViewObservationQueryDTO } from '../dtos/view-observation-query.dto';
 import { FileInterceptor } from '@nestjs/platform-express';
-import { ObservationImportService } from '../services/observation-import.service';
+import { ObservationImportService } from '../services/observations-import.service';
 import { AuthorisedStationsPipe } from 'src/user/pipes/authorised-stations.pipe';
 import { Request } from 'express';
 import { AuthUtil } from 'src/user/services/auth.util';
 import { EntryFormObservationQueryDto } from '../dtos/entry-form-observation-query.dto';
 import { DeleteObservationDto } from '../dtos/delete-observation.dto';
 import { Admin } from 'src/user/decorators/admin.decorator';
-import { ExportObservationsService } from '../services/export-observations.service';
+import { ObservationsExportService } from '../services/observations-export.service';
 import { AuthorisedExportsPipe } from 'src/user/pipes/authorised-exports.pipe';
 import { AuthorisedImportsPipe } from 'src/user/pipes/authorised-imports.pipe';
 import { StationStatusQueryDto } from '../dtos/station-status-query.dto';
 import { StationStatusDataQueryDto } from '../dtos/station-status-data-query.dto';
 import { DataAvailabilitySummaryQueryDto } from '../dtos/data-availability-summary-query.dto';
-import { DataEntryCheckService } from '../services/data-entry-check.service';
+import { DataEntryAndCorrectionCheckService } from '../services/data-entry-corection-check.service';
 import { DataFlowQueryDto } from '../dtos/data-flow-query.dto';
 import { QCStatusEnum } from '../enums/qc-status.enum';
 import { DataAvailabilityDetailsQueryDto } from '../dtos/data-availability-details-query.dto';
@@ -25,9 +25,9 @@ import { DataAvailabilityDetailsQueryDto } from '../dtos/data-availability-detai
 export class ObservationsController {
   constructor(
     private observationsService: ObservationsService,
-    private observationUpload: ObservationImportService,
-    private exportObservationsService: ExportObservationsService,
-    private dataEntryCheckService: DataEntryCheckService,
+    private observationImportService: ObservationImportService,
+    private observationExportsService: ObservationsExportService,
+    private dataEntryCheckService: DataEntryAndCorrectionCheckService,
   ) { }
 
   @Get()
@@ -80,23 +80,20 @@ export class ObservationsController {
     return this.observationsService.findDataFlow(query);
   }
 
-  @Get('generate-export/:templateid')
+  @Get('generate-export/:specificationid')
   generateExports(
     @Req() request: Request,
-    @Param('templateid', AuthorisedExportsPipe) exportTemplateId: number,
-    @Query() viewObsevationQuery: ViewObservationQueryDTO): Promise<number> {
-    return this.exportObservationsService.generateExports(exportTemplateId, viewObsevationQuery, AuthUtil.getLoggedInUser(request).id);
+    @Param('specificationid', AuthorisedExportsPipe) exportSpecificationId: number,
+    @Query() viewObsevationQuery: ViewObservationQueryDTO) {
+    return this.observationExportsService.generateManualExport(exportSpecificationId, viewObsevationQuery, AuthUtil.getLoggedInUser(request));
   }
 
-  @Get('download-export/:templateid')
-  @Header('Content-Type', 'text/csv')
-  @Header('Content-Disposition', 'attachment; filename="observations.csv"') // TODO. make the name be dynamic
+  @Get('download-export/:uniquedownloadid')
   async download(
-    @Req() request: Request,
-    @Param('templateid', AuthorisedExportsPipe) exportTemplateId: number
+    @Param('uniquedownloadid') uniqueDownloadId: string
   ) {
     // Stream the exported file to the response
-    return await this.exportObservationsService.downloadExport(exportTemplateId, AuthUtil.getLoggedInUser(request).id);
+    return this.observationExportsService.manualDownloadExport(uniqueDownloadId);
   }
 
   @Put('data-entry')
@@ -107,12 +104,12 @@ export class ObservationsController {
     const user = AuthUtil.getLoggedInUser(request);
 
     // Validate form data. If any invalid bad request will be thrown
-    await this.dataEntryCheckService.checkData(observationDtos, user);
+    await this.dataEntryCheckService.checkData(observationDtos, user, 'data-entry');
 
     // Save the data
     await this.observationsService.bulkPut(observationDtos, user.id);
 
-    // Return success if all operations are successful
+    // // TODO. deprecate the JSON below and just return http success - http 200
     return { message: "success" };
   }
 
@@ -124,15 +121,22 @@ export class ObservationsController {
     const user = AuthUtil.getLoggedInUser(request);
 
     // Validate form data. If any invalid bad request will be thrown
-    await this.dataEntryCheckService.checkData(observationDtos, user);
+    await this.dataEntryCheckService.checkData(observationDtos, user, 'data-entry');
 
     // Save the data
     await this.observationsService.bulkPut(observationDtos, user.id, QCStatusEnum.PASSED);
 
-    // Return success if all operations are successful
+    // TODO. Just return success - http 200
     return { message: "success" };
   }
 
+  //-------------------------------------------------------------------------------
+  // TODO. Consider merging the below upload handlers or deprecating them.
+  // Once import preview is considered as first enough even for large imports, it may not be necessary to have this handler for by front end.
+  // For external systems. Consider using source names instead of source id.
+  //-------------------------------------------------------------------------------
+  // TODO. Merge this with route `'upload/:sourceid/:stationid'`. This can be done by using a dto that has both source id and station id, with station id being optional.
+  // Note, the front end manual import uses `ImportPreviewController` controller. So this should be deprecated or modified for external systems only.
   @Post('upload/:sourceid')
   @UseInterceptors(FileInterceptor('file'))
   async uploadFile(
@@ -140,21 +144,17 @@ export class ObservationsController {
     @Param('sourceid', AuthorisedImportsPipe) sourceId: number,
     @UploadedFile(new ParseFilePipe({
       validators: [
-        new MaxFileSizeValidator({ maxSize: 1024 * 1024 * 1024 * 1 }), // 1GB
-        new FileTypeValidator({ fileType: 'text/csv' }),
+        // 1GB to accomodate preview of large files. Note, should always be same us that used in `ImportPreviewController` for upload endpoint to ensure smooth preview of files uploaded for import.
+        new MaxFileSizeValidator({ maxSize: 1024 * 1024 * 1024 }),
+        new FileTypeValidator({ fileType: /(text\/csv|text\/plain|application\/octet-stream)/, fallbackToMimetype: true }),
       ]
     })
     ) file: Express.Multer.File) {
-    try {
-      const user = AuthUtil.getLoggedInUser(request);
-      await this.observationUpload.processFile(sourceId, file, user.id, user.username);
-      return { message: "success" };
-    } catch (error) {
-      return { message: `error: ${error}` };
-    }
-
+    return this.observationImportService.processManualImport(sourceId, file, AuthUtil.getLoggedInUser(request).id);
   }
 
+  // TODO. Merge this with route `'upload/:sourceid'`. This can be done by using a dto that has both source id and station id, with station id being optional.
+  // Note, front end manual import uses `ImportPreviewController` controller. So this should be deprecated or modified for external systems only.
   @Post('upload/:sourceid/:stationid')
   @UseInterceptors(FileInterceptor('file'))
   async uploadFileForStation(
@@ -163,21 +163,16 @@ export class ObservationsController {
     @Param('stationid', AuthorisedStationsPipe) stationId: string,
     @UploadedFile(new ParseFilePipe({
       validators: [
-        new MaxFileSizeValidator({ maxSize: 1024 * 1024 * 1024 }), // 1GB
-        new FileTypeValidator({ fileType: 'text/csv' }),
+        // 1GB to accomodate preview of large files. Note, should always be same us that used in `ImportPreviewController` for upload endpoint to ensure smooth preview of files uploaded for import.
+        new MaxFileSizeValidator({ maxSize: 1024 * 1024 * 1024 }),
+        new FileTypeValidator({ fileType: /(text\/csv|text\/plain|application\/octet-stream)/, fallbackToMimetype: true }),
       ]
     })
     ) file: Express.Multer.File) {
 
-    try {
-      const user = AuthUtil.getLoggedInUser(request);
-      await this.observationUpload.processFile(sourceId, file, user.id, user.username, stationId);
-      return { message: "success" };
-    } catch (error) {
-      return { message: `error: ${error}` };
-    }
-
+    return this.observationImportService.processManualImport(sourceId, file, AuthUtil.getLoggedInUser(request).id, stationId);
   }
+  //-------------------------------------------------------------------------------
 
   @Admin()
   @Patch('restore')
@@ -191,7 +186,11 @@ export class ObservationsController {
   async softDelete(
     @Req() request: Request,
     @Body(AuthorisedStationsPipe, new ParseArrayPipe({ items: DeleteObservationDto })) observationDtos: DeleteObservationDto[]) {
-    return this.observationsService.softDelete(observationDtos, AuthUtil.getLoggedInUserId(request));
+    const user = AuthUtil.getLoggedInUser(request);
+    // Validate form data. If any invalid bad request will be thrown
+    await this.dataEntryCheckService.checkData(observationDtos, user, 'data-entry');
+
+    return this.observationsService.softDelete(observationDtos, user.id);
   }
 
   @Admin()

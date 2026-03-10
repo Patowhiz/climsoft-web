@@ -23,10 +23,9 @@ export enum MainMenuNameEnum {
 export enum SubMenuNameEnum {
     DATA_ENTRY = 'Data Entry',
     MANUAL_IMPORT = 'Manual Import',
-    SCHEDULED_IMPORT = 'Scheduled Import',
+    //SCHEDULED_IMPORT = 'Scheduled Import',
     DATA_CORRECTION = 'Data Correction',
     DELETED_DATA = 'Deleted Data',
-    //MISSING_DATA = 'Missing Data',
 
     STATION_STATUS = 'Station Status',
     DATA_FLOW = 'Data Flow',
@@ -35,26 +34,27 @@ export enum SubMenuNameEnum {
 
     SOURCE_CHECKS = 'Source Checks',
     QC_ASSESSMENT = 'QC Assessment',
-    SCHEDULED_QC_TESTS = 'Scheduled QC Tests',
+    //SCHEDULED_QC_TESTS = 'Scheduled QC Tests',
 
     MANUAL_EXPORT = 'Manual Export',
-    SCHEDULED_EXPORT = 'Scheduled Export',
+    //SCHEDULED_EXPORT = 'Scheduled Export',
 
     ELEMENTS = 'Elements',
-    QC_TESTS = 'QC Tests',    
     ORGANISATIONS = 'Organisations',
     NETWORK_AFFILIATIONS = 'Network Affiliations',
     REGIONS = 'Regions',
     STATIONS = 'Stations',
-    SOURCE_TEMPLATES = 'Source Templates',
-    EXPORT_TEMPLATES = 'Export Templates',
-    INTEGRATION_CONNECTORS = 'Integration Connectors',
+    QC_SPECIFICATIONS = 'QC Specifications',
+    SOURCE_SPECIFICATIONS = 'Source Specifications',
+    EXPORT_SPECIFICATIONS = 'Export Specifications',
+    CONNECTOR_SPECIFICATIONS = 'Connector Specifications',
 
     USER_GROUPS = 'User Groups',
     USERS = 'Users',
     CLIMSOFT_V4 = 'Climsoft V4',
     SETTINGS = 'Settings',
-    AUDIT_LOGS = 'Audit Logs',
+    JOB_QUEUE = 'Job Queue',
+    CONNECTOR_LOGS = 'Connector Logs',
 }
 
 export class MenuItemsUtil {
@@ -64,7 +64,7 @@ export class MenuItemsUtil {
             name: MainMenuNameEnum.DATA_INGESTION,
             url: '/data-ingestion',
             icon: 'bi bi-file-earmark-text',
-            open: false,
+            open: true, // By default, data ingestion to always be open. Helps with simplify the learning curve in data entry on mobile phones.
             children: [
                 {
                     name: SubMenuNameEnum.DATA_ENTRY,
@@ -74,10 +74,10 @@ export class MenuItemsUtil {
                     name: SubMenuNameEnum.MANUAL_IMPORT,
                     url: '/manual-import-selection',
                 },
-                {
-                    name: SubMenuNameEnum.SCHEDULED_IMPORT,
-                    url: '/auto-import-selection',
-                },
+                // {
+                //     name: SubMenuNameEnum.SCHEDULED_IMPORT,
+                //     url: '/auto-import-selection',
+                // },
                 {
                     name: SubMenuNameEnum.DATA_CORRECTION,
                     url: '/data-correction',
@@ -132,10 +132,10 @@ export class MenuItemsUtil {
                     name: SubMenuNameEnum.QC_ASSESSMENT,
                     url: '/qc-assessment',
                 },
-                {
-                    name: SubMenuNameEnum.SCHEDULED_QC_TESTS,
-                    url: '/scheduled-qc-selection',
-                },
+                // {
+                //     name: SubMenuNameEnum.SCHEDULED_QC_TESTS,
+                //     url: '/scheduled-qc-selection',
+                // },
             ]
         }
     }
@@ -151,10 +151,10 @@ export class MenuItemsUtil {
                     name: SubMenuNameEnum.MANUAL_EXPORT,
                     url: '/manual-export-selection',
                 },
-                {
-                    name: SubMenuNameEnum.SCHEDULED_EXPORT,
-                    url: '/auto-export-selection',
-                },
+                // {
+                //     name: SubMenuNameEnum.SCHEDULED_EXPORT,
+                //     url: '/auto-export-selection',
+                // },
             ]
         };
     }
@@ -186,21 +186,21 @@ export class MenuItemsUtil {
                     name: SubMenuNameEnum.STATIONS,
                     url: '/view-stations',
                 },
-                 {
-                    name: SubMenuNameEnum.QC_TESTS,
-                    url: '/view-qc-tests',
+                {
+                    name: SubMenuNameEnum.QC_SPECIFICATIONS,
+                    url: '/view-qc-test-specifications',
                 },
                 {
-                    name: SubMenuNameEnum.SOURCE_TEMPLATES,
-                    url: '/view-sources',
+                    name: SubMenuNameEnum.SOURCE_SPECIFICATIONS,
+                    url: '/view-source-specifications',
                 },
                 {
-                    name: SubMenuNameEnum.EXPORT_TEMPLATES,
-                    url: '/view-exports',
+                    name: SubMenuNameEnum.EXPORT_SPECIFICATIONS,
+                    url: '/view-export-specifications',
                 },
                 {
-                    name: SubMenuNameEnum.INTEGRATION_CONNECTORS,
-                    url: '/view-connectors',
+                    name: SubMenuNameEnum.CONNECTOR_SPECIFICATIONS,
+                    url: '/view-connector-specifications',
                 },
             ]
         }
@@ -230,8 +230,12 @@ export class MenuItemsUtil {
                     url: '/view-general-settings',
                 },
                 {
-                    name: SubMenuNameEnum.AUDIT_LOGS,
-                    url: '/view-audits',
+                    name: SubMenuNameEnum.JOB_QUEUE,
+                    url: '/view-job-queue',
+                },
+                {
+                    name: SubMenuNameEnum.CONNECTOR_LOGS,
+                    url: '/view-connector-logs',
                 },
 
             ]

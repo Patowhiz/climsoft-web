@@ -1,17 +1,17 @@
 --- qc record function. Returns true when one qc tests fails and false when none fails or no qc was was done
 CREATE OR REPLACE FUNCTION func_execute_qc_tests(
-    observation_record RECORD,
+    observation_record RECORD, -- TODO. Use the row type of observations table
     user_id INT4
 ) RETURNS BOOL AS $$
 DECLARE
-    qc_test RECORD;
+    qc_test RECORD; -- TODO. Use the row type of qc_test_specifications table
     qc_test_log JSONB;
     all_qc_tests_log JSONB := '[]'::JSONB;
-    final_qc_status observations_qc_status_enum := 'passed';
+    final_qc_status observations_qc_status_enum := 'passed'; -- TODO. use the correct column type of observations table
 BEGIN
     -- Skip QC if value is NULL
     IF observation_record.value IS NULL THEN
-        RETURN TRUE; -- Return false when no update of the qc status
+        RETURN TRUE; -- TODO. Set the QC status of the record to 'none'. Conceptually speaking, NULL values can't pass QC tests because they don't exist!
     END IF;
 
     -- Loop through all relevant QC tests
@@ -58,7 +58,7 @@ BEGIN
 		all_qc_tests_log := NULL;
     END IF;
 
-    -- Update the observation record
+    -- Update the observation record. TODO. Use table alias
     UPDATE observations
     SET qc_status = final_qc_status,
         qc_test_log = all_qc_tests_log,
@@ -69,7 +69,7 @@ BEGIN
       AND interval = observation_record.interval
       AND source_id = observation_record.source_id
       AND date_time = observation_record.date_time;
-RETURN final_qc_status = 'failed'; -- Return true after successful update of the qc status
+RETURN final_qc_status = 'failed'; -- TODO. This function should eventually not return anything
 END;
 $$ LANGUAGE plpgsql;
 
@@ -83,13 +83,38 @@ DECLARE
     lower_threshold FLOAT8;
     upper_threshold FLOAT8;
     qc_test_log JSONB;
+    params JSONB;
+    obs_month INT;
+    threshold_pair JSONB;
 BEGIN
-    -- Decode the JSON parameters to extract lower and upper limits
-    lower_threshold := (qc_test.parameters->>'lowerThreshold')::FLOAT8;
-    upper_threshold := (qc_test.parameters->>'upperThreshold')::FLOAT8;
+    params := qc_test.parameters;
+
+    -- Check for station-specific thresholds first
+    IF params ? 'stationIds' AND jsonb_array_length(params->'stationIds') > 0 AND NOT params->'stationIds' @> to_jsonb(observation_record.station_id) THEN
+        -- This QC test is for specific stations, and the current observation's station is not one of them.
+        -- So we don't perform the test. Returning NULL indicates the test was not applicable.
+        RETURN NULL;
+    END IF;
+
+    -- Check for monthly thresholds
+    IF params ? 'monthsThresholds' THEN
+        obs_month := EXTRACT(MONTH FROM observation_record.date_time);
+        threshold_pair := (params->'monthsThresholds')->(obs_month - 1);
+        IF threshold_pair IS NOT NULL AND threshold_pair != 'null'::jsonb THEN
+            lower_threshold := (threshold_pair->>'lowerThreshold')::FLOAT8;
+            upper_threshold := (threshold_pair->>'upperThreshold')::FLOAT8;
+        END IF;
+    END IF;
+
+    -- If no monthly threshold was found, fall back to allRangeThreshold
+    IF lower_threshold IS NULL AND params ? 'allRangeThreshold' THEN
+        threshold_pair := params->'allRangeThreshold';
+        lower_threshold := (threshold_pair->>'lowerThreshold')::FLOAT8;
+        upper_threshold := (threshold_pair->>'upperThreshold')::FLOAT8;
+    END IF;
 
     -- Perform the range check and create the qc test log
-    IF observation_record.value < lower_threshold OR observation_record.value > upper_threshold THEN
+    IF lower_threshold IS NOT NULL AND (observation_record.value < lower_threshold OR observation_record.value > upper_threshold) THEN
         qc_test_log := jsonb_build_object('qcTestId', qc_test.id, 'qcStatus', 'failed');
 	ELSE
 		 qc_test_log := jsonb_build_object('qcTestId', qc_test.id, 'qcStatus', 'passed');

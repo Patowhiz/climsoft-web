@@ -1,21 +1,23 @@
 import { Injectable, Logger } from '@nestjs/common';
 import * as mariadb from 'mariadb';
 import { ElementsService } from 'src/metadata/elements/services/elements.service';
-import { CreateViewElementDto } from 'src/metadata/elements/dtos/elements/create-view-element.dto';
+import { CreateViewElementDto } from 'src/metadata/elements/dtos/create-view-element.dto';
 import { StationsService } from 'src/metadata/stations/services/stations.service';
-import { CreateStationDto } from 'src/metadata/stations/dtos/create-update-station.dto';
+import { CreateStationDto } from 'src/metadata/stations/dtos/create-station.dto';
 import { StringUtils } from 'src/shared/utils/string.utils';
 import { StationObsProcessingMethodEnum } from 'src/metadata/stations/enums/station-obs-processing-method.enum';
 import { StationStatusEnum } from 'src/metadata/stations/enums/station-status.enum';
-import { UsersService } from 'src/user/services/users.service';
-import { SourceTemplatesService } from 'src/metadata/source-templates/services/source-templates.service';
+import { SourceSpecificationsService } from 'src/metadata/source-specifications/services/source-specifications.service';
 import { AppConfig } from 'src/app.config';
-import { ViewSourceDto } from 'src/metadata/source-templates/dtos/view-source.dto';
-import { FindOptionsWhere } from 'typeorm';
-import { SourceTemplateEntity } from 'src/metadata/source-templates/entities/source-template.entity';
+import { ViewSourceSpecificationDto } from 'src/metadata/source-specifications/dtos/view-source-specification.dto';
 import { ClimsoftV4ImportParametersDto } from '../dtos/climsoft-v4-import-parameters.dto';
-import { SourceTypeEnum } from 'src/metadata/source-templates/enums/source-type.enum';
-import { CreateUpdateSourceDto } from 'src/metadata/source-templates/dtos/create-update-source.dto';
+import { SourceTypeEnum } from 'src/metadata/source-specifications/enums/source-type.enum';
+import { CreateSourceSpecificationDto } from 'src/metadata/source-specifications/dtos/create-source-specification.dto';
+import { QCSpecificationsService } from 'src/metadata/qc-specifications/services/qc-specifications.service';
+import { CreateQCSpecificationDto } from 'src/metadata/qc-specifications/dtos/create-qc-specification.dto';
+import { ViewQCSpecificationDto } from 'src/metadata/qc-specifications/dtos/view-qc-specification.dto';
+import { QCTestTypeEnum } from 'src/metadata/qc-specifications/entities/qc-test-type.enum';
+import { RangeThresholdQCTestParamsDto } from 'src/metadata/qc-specifications/dtos/qc-test-parameters/range-qc-test-params.dto';
 
 export interface V4ElementModel {
     elementId: number;
@@ -43,7 +45,7 @@ export interface V4StationModel {
     qualifier: string | null;
     stationOperational: boolean;
     openingDatetime: string | null;
-    closingDatetime: string | null; 
+    closingDatetime: string | null;
 }
 
 @Injectable()
@@ -54,17 +56,13 @@ export class ClimsoftV4WebSyncSetUpService {
     public v4UtcOffset: number = 0;
     public readonly v4Elements: Map<number, V4ElementModel> = new Map(); // Using map because of performance. 
     public readonly v4Stations: Set<string> = new Set();
-    public readonly webSources: Map<number, string> = new Map();
-    public readonly webUsers: Map<number, string> = new Map();
-    public readonly webStations: Set<string> = new Set();
-    public readonly webElements: Set<number> = new Set();
     public readonly v4Conflicts: string[] = [];
 
     constructor(
         private elementsService: ElementsService,
+        private qcTestsService: QCSpecificationsService,
         private stationsService: StationsService,
-        private sourcesService: SourceTemplatesService,
-        private usersService: UsersService,
+        private sourcesService: SourceSpecificationsService,
     ) {
     }
 
@@ -110,7 +108,7 @@ export class ClimsoftV4WebSyncSetUpService {
 
             this.v4UtcOffset = AppConfig.v4DbCredentials.utcOffset;
 
-            this.logger.log('creating connection pool for: ', AppConfig.v4DbCredentials.host);
+            this.logger.log(`creating connection pool for ${AppConfig.v4DbCredentials.host} at port ${AppConfig.v4DbCredentials.port}`);
 
             // create v4 database connection pool
             this.v4DBPool = mariadb.createPool({
@@ -119,7 +117,7 @@ export class ClimsoftV4WebSyncSetUpService {
                 password: AppConfig.v4DbCredentials.password,
                 database: AppConfig.v4DbCredentials.databaseName,
                 port: AppConfig.v4DbCredentials.port,
-                dateStrings: true, 
+                dateStrings: true,
                 charset: 'utf8mb4',
             });
 
@@ -131,14 +129,6 @@ export class ClimsoftV4WebSyncSetUpService {
 
             // set up v4 stations used to check if v4 has stations that are in v5 database
             await this.setupV4StationsChecking();
-
-            await this.setupV5Sources();
-
-            await this.setupWebUsers();
-
-            await this.setupWebStationsChecking();
-
-            await this.setupWebElementsChecking();
 
         } catch (error) {
             this.logger.error('Setting up V4 database connection failed: ', error);
@@ -154,26 +144,6 @@ export class ClimsoftV4WebSyncSetUpService {
     private async setupV4StationsChecking(): Promise<void> {
         this.v4Stations.clear();
         (await this.getV4Stations()).forEach((item) => this.v4Stations.add(item.stationId));
-    }
-
-    public async setupV5Sources(): Promise<void> {
-        this.webSources.clear();
-        (await this.sourcesService.findAll()).forEach(item => this.webSources.set(item.id, item.name));
-    }
-
-    public async setupWebUsers(): Promise<void> {
-        this.webUsers.clear();
-        (await this.usersService.findAll()).forEach(item => this.webUsers.set(item.id, item.email));
-    }
-
-    private async setupWebStationsChecking(): Promise<void> {
-        this.webStations.clear();
-        (await this.stationsService.find()).forEach((item) => this.webStations.add(item.id));
-    }
-
-    private async setupWebElementsChecking(): Promise<void> {
-        this.webElements.clear();
-        (await this.elementsService.find()).forEach((item) => this.webElements.add(item.id));
     }
 
     public async disconnect(): Promise<void> {
@@ -200,7 +170,7 @@ export class ClimsoftV4WebSyncSetUpService {
         let conn;
         try {
             conn = await this.v4DBPool.getConnection();
-            const rows: V4ElementModel[] = await conn.query("SELECT elementId as elementId, abbreviation as abbreviation, elementName as elementName, description as description, elementScale as elementScale, upperLimit as upperLimit, lowerLimit as lowerLimit, units as units, elementtype as elementType, qcTotalRequired as qcTotalRequired, selected as selected FROM obselement WHERE selected = 1");
+            const rows: V4ElementModel[] = await conn.query("SELECT elementId as elementId, abbreviation as abbreviation, elementName as elementName, description as description, elementScale as elementScale, upperLimit as upperLimit, lowerLimit as lowerLimit, units as units, elementtype as elementType, qcTotalRequired as qcTotalRequired, selected as selected FROM obselement");
             rows.forEach(item => {
                 item.elementId = Number(item.elementId); // version 4 stores element ids as BigInt, so convert to number (int)
                 item.elementType = item.elementType.trim().toLowerCase();
@@ -256,8 +226,8 @@ export class ClimsoftV4WebSyncSetUpService {
                 name: v4Element.elementName,
                 description: v4Element.description,
                 units: v4Element.units,
-                typeId: currentV5Element ? currentV5Element.typeId : 1, // V4 does not support GCOS ECV structure so just assume it's type id 1             
-                entryScaleFactor: v4Element.elementScale ? this.convertv4EntryScaleDecimalTov5WholeNumber(v4Element.elementScale) : null,
+                typeId: undefined, // V4 does not support GCOS ECV structure           
+                entryScaleFactor: v4Element.elementScale ? this.convertv4EntryScaleDecimalTov5WholeNumber(v4Element.elementScale) : undefined,
                 comment: 'pulled from v4 model',
             };
 
@@ -268,10 +238,84 @@ export class ClimsoftV4WebSyncSetUpService {
 
         // Important to do this just incase observations were not being saved to v4 database due to lack of elements or changes in v4 configuration
         this.setupV4ElementsForV5MappingAndChecking();
-        this.setupWebElementsChecking();
+        return true;
+    }
 
-        // TODO. create and save upper limit and lower limit qc test
+    public async saveV4QCsToV5DB(userId: number): Promise<boolean> {
+        // if version 4 database pool is not set up then return.
+        if (!this.v4DBPool) {
+            return false;
+        }
 
+        const currentV5QCTests: ViewQCSpecificationDto[] = await this.qcTestsService.findQCTestByType(QCTestTypeEnum.RANGE_THRESHOLD);
+        const v4Elements: V4ElementModel[] = await this.getV4Elements();
+        for (let i = 0; i < v4Elements.length; i++) {
+            const v4Element: V4ElementModel = v4Elements[i];
+            const v4ElementType = v4Element.elementType.toLowerCase();
+            let interval: number;
+
+
+            if (v4ElementType === 'hourly') {
+                interval = 60;
+            } else if (v4ElementType === 'daily') {
+                interval = 1440;
+            } else {
+                continue; // No support for other element types
+            }
+
+            if (StringUtils.isNullOrEmpty(v4Element.lowerLimit, true) || isNaN(Number(v4Element.lowerLimit))) {
+                continue;
+            }
+
+            if (StringUtils.isNullOrEmpty(v4Element.upperLimit, true) || isNaN(Number(v4Element.upperLimit))) {
+                continue;
+            }
+
+            let lowerThreshold: number = Number(v4Element.lowerLimit);
+            let upperThreshold: number = Number(v4Element.upperLimit);
+
+            if (v4Element.elementScale) {
+                lowerThreshold = lowerThreshold * v4Element.elementScale;
+                upperThreshold = upperThreshold * v4Element.elementScale;
+            }
+
+            const params: RangeThresholdQCTestParamsDto = { allRangeThreshold: { lowerThreshold: lowerThreshold, upperThreshold: upperThreshold } };
+
+            // Make sure abbreviation is not empty
+            if (StringUtils.isNullOrEmpty(v4Element.abbreviation, true)) {
+                v4Element.abbreviation = `Empty_${i + 1}`;
+            }
+            const qcName: string = `${v4Element.abbreviation} range threshold`;
+
+            // Use qc name or  (element id, level, interval and comment) to get threshold that came from V4
+            const currentV5QCTest = currentV5QCTests.find(
+                item => item.name === qcName || (item.elementId === v4Element.elementId && item.observationLevel === 0 && item.observationInterval === interval && item.comment === 'pulled from v4 model')
+            );
+
+            if (currentV5QCTest) {
+                currentV5QCTest.parameters = params;
+                await this.qcTestsService.update(currentV5QCTest.id, currentV5QCTest, userId);
+                this.logger.log(`V4 QC ${currentV5QCTest.name} updated`);
+            } else {
+
+                const dto: CreateQCSpecificationDto = {
+                    name: qcName,
+                    description: 'QC range threshold',
+                    elementId: v4Element.elementId,
+                    observationLevel: 0,
+                    observationInterval: interval,
+                    qcTestType: QCTestTypeEnum.RANGE_THRESHOLD,
+                    parameters: params,
+                    disabled: false,
+                    comment: 'pulled from v4 model',
+                };
+
+
+                await this.qcTestsService.create(dto, userId);
+                this.logger.log(`V4 QC ${dto.name} created`);
+            }
+
+        }
         return true;
     }
 
@@ -332,15 +376,15 @@ export class ClimsoftV4WebSyncSetUpService {
             // Some climsoft version 4 installations have the below columns storing null bytes instead of nulls
             // So ignore such null bytes
             //----------------------------------------------
-            if(v4Station.wmoid !== null && v4Station.wmoid.startsWith('\x00')){
+            if (v4Station.wmoid !== null && v4Station.wmoid.startsWith('\x00')) {
                 v4Station.wmoid = null;
             }
 
-             if(v4Station.wsi !== null && v4Station.wsi.startsWith('\x00')){
+            if (v4Station.wsi !== null && v4Station.wsi.startsWith('\x00')) {
                 v4Station.wsi = null;
             }
 
-             if(v4Station.icaoid !== null && v4Station.icaoid.startsWith('\x00')){
+            if (v4Station.icaoid !== null && v4Station.icaoid.startsWith('\x00')) {
                 v4Station.icaoid = null;
             }
 
@@ -366,20 +410,21 @@ export class ClimsoftV4WebSyncSetUpService {
             const dto: CreateStationDto = {
                 id: v4Station.stationId,
                 name: v4Station.stationName,
-                description: currentV5Station ? currentV5Station.description : null,
+                description: currentV5Station?.description || undefined,
                 longitude: v4Station.longitude,
                 latitude: v4Station.latitude,
-                elevation: StringUtils.containsNumbersOnly(v4Station.elevation) ? Number.parseFloat(v4Station.elevation) : null,
-                stationObsProcessingMethod: currentV5Station ? currentV5Station.stationObsProcessingMethod : StationObsProcessingMethodEnum.MANUAL, // TODO. Extrapolate from name?
-                stationObsEnvironmentId: currentV5Station ? currentV5Station.stationObsEnvironmentId : null,// Give fixed land by default?
-                stationObsFocusId: currentV5Station ? currentV5Station.stationObsFocusId : null, // extrapolate from qualifier?
-                organisationId: currentV5Station ? currentV5Station.organisationId : null,
-                wmoId: v4Station.wmoid,
-                wigosId: v4Station.wsi,
-                icaoId: v4Station.icaoid,
+                elevation: StringUtils.containsNumbersOnly(v4Station.elevation) ? Number.parseFloat(v4Station.elevation) : undefined,
+                stationObsProcessingMethod: currentV5Station?.stationObsProcessingMethod || StationObsProcessingMethodEnum.MANUAL, // TODO. Extrapolate from name?
+                stationObsEnvironmentId: currentV5Station?.stationObsEnvironmentId || undefined,// Give fixed land by default?
+                stationObsFocusId: currentV5Station?.stationObsFocusId || undefined, // extrapolate from qualifier?
+                ownerId: currentV5Station?.ownerId || undefined,
+                operatorId: currentV5Station?.operatorId || undefined,
+                wmoId: v4Station.wmoid || undefined,
+                wigosId: v4Station.wsi || undefined,
+                icaoId: v4Station.icaoid || undefined,
                 status: v4Station.stationOperational ? StationStatusEnum.OPERATIONAL : StationStatusEnum.CLOSED,
-                dateEstablished: currentV5Station ? currentV5Station.dateEstablished : null, // TODO. Confirm the date format and convert accordingly
-                dateClosed: currentV5Station ? currentV5Station.dateClosed : null, // TODO. Confirm the date format and convert accordingly
+                dateEstablished: currentV5Station?.dateEstablished || undefined, // TODO. Confirm the date format and convert accordingly
+                dateClosed: currentV5Station?.dateClosed || undefined, // TODO. Confirm the date format and convert accordingly
                 comment: 'pulled from v4 model',
             };
 
@@ -401,27 +446,23 @@ export class ClimsoftV4WebSyncSetUpService {
 
         // Important to do this just incase observations were not being saved to v4 database due to lack of stations or changes in v4 configuration
         this.setupV4StationsChecking();
-        this.setupWebStationsChecking();
 
         return true;
     }
 
-    public async getClimsoftImportSource(): Promise<ViewSourceDto | null> {
-        const selectOptions: FindOptionsWhere<SourceTemplateEntity> = {
-            name: 'climsoft_v4',
-        };
-        await this.sourcesService.findAll(selectOptions);
-        const existingClimsoftV4Source = await this.sourcesService.findAll(selectOptions);
+    public getClimsoftImportSource(): ViewSourceSpecificationDto | null {
+        const allSources = this.sourcesService.findAll();
+        const existingClimsoftV4Source = allSources.filter(s => s.name === 'climsoft_v4');
         return existingClimsoftV4Source.length > 0 ? existingClimsoftV4Source[0] : null;
     }
 
-    public async saveClimsoftImportParameters(importParameters: ClimsoftV4ImportParametersDto, userId: number): Promise<ViewSourceDto> {
-        const existingClimsoftV4Source: ViewSourceDto | null = await this.getClimsoftImportSource();
+    public async saveClimsoftImportParameters(importParameters: ClimsoftV4ImportParametersDto, userId: number): Promise<ViewSourceSpecificationDto> {
+        const existingClimsoftV4Source: ViewSourceSpecificationDto | null = this.getClimsoftImportSource();
         if (existingClimsoftV4Source) {
             existingClimsoftV4Source.parameters = importParameters;
             return await this.sourcesService.update(existingClimsoftV4Source.id, existingClimsoftV4Source, userId);
         } else {
-            const newClismoftSource: CreateUpdateSourceDto = {
+            const newClismoftSource: CreateSourceSpecificationDto = {
                 name: 'climsoft_v4',
                 description: 'Import from Climsoft version 4 database',
                 sourceType: SourceTypeEnum.IMPORT,
@@ -429,7 +470,7 @@ export class ClimsoftV4WebSyncSetUpService {
                 utcOffset: this.v4UtcOffset,
                 allowMissingValue: true,
                 scaleValues: false,
-                sampleImage: '',
+                sampleFileName: '',
                 disabled: false,
                 comment: null,
             }

@@ -1,11 +1,11 @@
 <div class="d-flex vh-100 overflow-hidden">
   <!-- Side Menu Content -->
-  <div *ngIf="bOpenSideNav" class="flex-shrink-0 overflow-y-auto border-light shadow-sm">
+  <div *ngIf="openSideNav" class="flex-shrink-0 overflow-y-auto border-light shadow-sm">
 
     <div class="navbar sticky-top shadow-sm bg-light p-0">
       <div class="d-flex flex-row w-100 justify-content-between">
         <div class=" nav-bar-title px-3 ">Climsoft Web</div>
-        <div *ngIf="bOpenSideNav" (click)="bOpenSideNav = !bOpenSideNav">
+        <div *ngIf="openSideNav" (click)="openSideNav = !openSideNav">
           <i class="bi bi-list py-1 nav-bar-icon"></i>
         </div>
       </div>
@@ -15,7 +15,7 @@
       <div class="card-body p-3">
         <div *ngIf="featuresNavItems" class="list-group list-group-flush">
           <!-- menu iems section -->
-          <div class="list-group-item list-group-item-action px-0 cursor-pointer" *ngFor="let nav of featuresNavItems">
+          <div class="list-group-item list-group-item-action px-0 app-cursor-pointer" *ngFor="let nav of featuresNavItems">
             <div class="list-group list-group-flush p-0 m-0">
               <a class="list-group-item list-group-item-action border-0 p-0 d-flex justify-content-between fw-bold"
                 [routerLink]="nav.children.length === 0? nav.url: null" (click)="nav.open = !nav.open">
@@ -29,7 +29,7 @@
               <div *ngIf="nav.children.length > 0">
                 <div *ngIf="nav.open" class="list-group-item list-group list-group-flush p-0 border-0">
                   <a *ngFor="let subNav of nav.children" class="list-group-item list-group-item-action"
-                    [routerLink]="nav.url + subNav.url">
+                    [routerLink]="nav.url + subNav.url" (click)="onMenuItemClick(nav)">
                     <i class="bi bi-arrow-right-short"></i> {{ subNav.name }}
                   </a>
                 </div>
@@ -50,7 +50,7 @@
     <div class="navbar bg-light sticky-top shadow-sm p-0 mb-3">
       <div class="d-flex flex-row justify-content-between w-100">
         <div class="d-inline-flex">
-          <div *ngIf="!bOpenSideNav" (click)="bOpenSideNav = !bOpenSideNav">
+          <div *ngIf="!openSideNav" (click)="openSideNav = !openSideNav">
             <i class="bi bi-list py-1 nav-bar-icon"></i>
           </div>
           <div class="ms-1 nav-bar-title">{{pageHeaderName}}</div>
@@ -61,16 +61,19 @@
             <i class="bi bi-arrow-repeat nav-bar-icon"></i>
             <span><sup>{{unsyncedObservations}}</sup></span>
           </div>
-          <div class="me-3">
-            <i class="bi bi-person py-1 nav-bar-icon" (click)="displayUserDropDown = !displayUserDropDown"></i>
-            <div *ngIf="displayUserDropDown" class="user-drop-down border border-dark rounded">
+          <div class="me-3" appCloseDropDown (closeDropdown)="closeUserDropDown()">
+            <!-- TODO. In future this can be made to display the initials of the logged in user -->
+            <i (click)="displayUserDropDown = !displayUserDropDown" class="bi bi-person py-1 nav-bar-icon"></i>
+
+            <div *ngIf="displayUserDropDown" 
+              class="user-drop-down border border-dark rounded">
               <div class="list-group">
                 <a *ngIf="user" href="#" class="list-group-item list-group-item-action">
-                  Profile - {{ user.username }}
+                  Profile - {{ user.email }}
                 </a>
                 <button *ngIf="user" type="button" class="list-group-item list-group-item-action"
-                  (click)="userPasswordChangeDialog.openDialog(user.id, user.username)">Change
-                  Password
+                  (click)="userPasswordChangeDialog.showDialog(user.id, user.email)">
+                  Change Password
                 </button>
                 <app-password-change #userPasswordChangeDialog />
                 <button type="button" class="list-group-item list-group-item-action" (click)="logOut()">

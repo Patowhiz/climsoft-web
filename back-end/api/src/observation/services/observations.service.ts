@@ -8,7 +8,6 @@ import { ViewObservationDto } from '../dtos/view-observation.dto';
 import { QCStatusEnum } from '../enums/qc-status.enum';
 import { EntryFormObservationQueryDto } from '../dtos/entry-form-observation-query.dto';
 import { DeleteObservationDto } from '../dtos/delete-observation.dto';
-import { ClimsoftWebToV4SyncService } from './climsoft-web-to-v4-sync.service';
 import { UsersService } from 'src/user/services/users.service';
 import { StationStatusQueryDto } from '../dtos/station-status-query.dto';
 import { StationStatusDataQueryDto } from '../dtos/station-status-data-query.dto';
@@ -20,62 +19,33 @@ import { DateUtils } from 'src/shared/utils/date.utils';
 import { DataFlowQueryDto } from '../dtos/data-flow-query.dto';
 import { ViewObservationLogDto } from '../dtos/view-observation-log.dto';
 import { ViewUserDto } from 'src/user/dtos/view-user.dto';
-import { OnEvent } from '@nestjs/event-emitter';
+import { EventEmitter2, OnEvent } from '@nestjs/event-emitter';
 import { DataAvailabilityDetailsQueryDto } from '../dtos/data-availability-details-query.dto';
 import { DataAvailaibilityDetailsDto } from '../dtos/data-availability-details.dto';
 
 @Injectable()
 export class ObservationsService {
     private readonly logger = new Logger(ObservationsService.name);
-    private users: Map<number, ViewUserDto> = new Map();
 
     constructor(
         @InjectRepository(ObservationEntity) private observationRepo: Repository<ObservationEntity>,
         private dataSource: DataSource,
-        private climsoftV4Service: ClimsoftWebToV4SyncService,
         private usersService: UsersService,
         private generalSettingsService: GeneralSettingsService,
+        private eventEmitter: EventEmitter2,
     ) {
-        this.resetLoadedusers();
     }
 
-    @OnEvent('user.created')
-    handleSourceCreated(payload: { id: number; dto: any }) {
-        console.log(`user created: ID ${payload.id}`);
+ 
 
-        this.resetLoadedusers();
-    }
-
-    @OnEvent('user.updated')
-    handleSourceUpdated(payload: { id: number; dto: any }) {
-        console.log(`user updated: ID ${payload.id}`);
-        this.resetLoadedusers();
-    }
-
-    @OnEvent('user.deleted')
-    handleSourceDeleted(payload: { id: number }) {
-        console.log(`user deleted: ID ${payload.id}`);
-        this.resetLoadedusers();
-    }
-
-    private async resetLoadedusers() {
-        this.users.clear();
-        const newUsers: ViewUserDto[] = await this.usersService.findAll();
-        for (const user of newUsers) {
-            this.users.set(user.id, user);
-        }
-    }
-
-    public async findFormData(queryDto: EntryFormObservationQueryDto): Promise<CreateObservationDto[]> {
+    public async findFormData(queryDto: EntryFormObservationQueryDto): Promise<ViewObservationDto[]> {
         const entities: ObservationEntity[] = await this.observationRepo.findBy({
             stationId: queryDto.stationId,
             elementId: In(queryDto.elementIds),
+            interval: queryDto.interval,
             sourceId: queryDto.sourceId,
             level: queryDto.level,
             datetime: Between(new Date(queryDto.fromDate), new Date(queryDto.toDate)),
-            // Note, interval is commented out because of cumulative data in entry forms
-            // Once its agreed to deprecate changing of interval at form level. Then merge findFormData and findProcessed functions.
-            //interval: queryDto.interval, 
             deleted: false,
         });
 
@@ -83,72 +53,7 @@ export class ObservationsService {
     }
 
     public async findProcessed(queryDto: ViewObservationQueryDTO): Promise<ViewObservationDto[]> {
-        return this.createViewObsDtos(await this.findProcessedObsEntities(queryDto));
-    }
-
-    private async createViewObsDtos(obsEntities: ObservationEntity[]): Promise<ViewObservationDto[]> {
-        const obsView: ViewObservationDto[] = [];
-        for (const obsEntity of obsEntities) {
-            const viewObs: ViewObservationDto = {
-                stationId: obsEntity.stationId,
-                elementId: obsEntity.elementId,
-                sourceId: obsEntity.sourceId,
-                level: obsEntity.level,
-                interval: obsEntity.interval,
-                datetime: obsEntity.datetime.toISOString(),
-                value: obsEntity.value,
-                flag: obsEntity.flag,
-                comment: obsEntity.comment,
-                qcStatus: obsEntity.qcStatus,
-                qcTestLog: obsEntity.qcTestLog,
-                log: this.createViewLog(obsEntity),
-                entryDatetime: obsEntity.entryDateTime.toISOString(),
-            };
-            obsView.push(viewObs);
-        }
-        return obsView;
-    }
-
-    private createViewLog(entity: ObservationEntity): ViewObservationLogDto[] {
-        const viewLogDto: ViewObservationLogDto[] = [];
-        let user: ViewUserDto | undefined;
-        if (entity.log) {
-            for (const logItem of entity.log) {
-                user = this.users.get(logItem.entryUserId);
-                viewLogDto.push({
-                    value: logItem.value,
-                    flag: logItem.flag,
-                    qcStatus: logItem.qcStatus,
-                    comment: logItem.comment,
-                    deleted: logItem.deleted,
-                    entryUserName: user ? user.name : '',
-                    entryUserEmail: user ? user.email : '',
-                    entryDateTime: logItem.entryDateTime,
-                });
-            }
-        }
-
-        // Include the current values as log.
-        // Important because present values should be part of the record history
-        user = this.users.get(entity.entryUserId);
-        const currentValuesAsLogObj: ViewObservationLogDto = {
-            value: entity.value,
-            flag: entity.flag,
-            qcStatus: entity.qcStatus,
-            comment: entity.comment,
-            deleted: entity.deleted,
-            entryUserName: user ? user.name : '',
-            entryUserEmail: user ? user.email : '',
-            entryDateTime: entity.entryDateTime.toISOString()
-        }
-
-        viewLogDto.push(currentValuesAsLogObj);
-        return viewLogDto;
-    }
-
-    public async findProcessedObsEntities(queryDto: ViewObservationQueryDTO): Promise<ObservationEntity[]> {
-        // TODO. This is a temporary check. Find out how we can do this at the dto validation level.
-        // TODO. Move this check else where so that this function can be universally applicable
+        // TODO. This is a temporary check. Find out how we can do this at the dto validation level. 
         if (!(queryDto.page && queryDto.pageSize && queryDto.pageSize <= 1000)) {
             throw new BadRequestException("You must specify page and page size. Page size must be less than or equal to 1000")
         }
@@ -166,24 +71,12 @@ export class ObservationsService {
             take: queryDto.pageSize
         };
 
-        return this.observationRepo.find(findOptions);
+        return this.createViewObsDtos(await this.observationRepo.find(findOptions));
     }
 
     public async count(selectObsevationDto: ViewObservationQueryDTO): Promise<number> {
         const whereOptions: FindOptionsWhere<ObservationEntity> = this.getProcessedFilter(selectObsevationDto);
         return this.observationRepo.countBy(whereOptions);
-    }
-
-    /**
-     * Counts the number of records needed to be saved to V4.
-     * Important note. Maximum count is 1,000,001 to limit compute needed
-     * @returns 
-     */
-    public async countObservationsNotSavedToV4(): Promise<number> {
-        return this.observationRepo.count({
-            where: { savedToV4: false },
-            take: 1000001, // Important. Limit to 1 million and 1 for performance reasons
-        });
     }
 
     private getProcessedFilter(queryDto: ViewObservationQueryDTO): FindOptionsWhere<ObservationEntity> {
@@ -245,6 +138,78 @@ export class ObservationsService {
 
     }
 
+    private async createViewObsDtos(obsEntities: ObservationEntity[]): Promise<ViewObservationDto[]> {
+        const obsView: ViewObservationDto[] = [];
+        for (const obsEntity of obsEntities) {
+            const viewObs: ViewObservationDto = {
+                stationId: obsEntity.stationId,
+                elementId: obsEntity.elementId,
+                sourceId: obsEntity.sourceId,
+                level: obsEntity.level,
+                interval: obsEntity.interval,
+                datetime: obsEntity.datetime.toISOString(),
+                value: obsEntity.value,
+                flag: obsEntity.flag,
+                comment: obsEntity.comment,
+                qcStatus: obsEntity.qcStatus,
+                qcTestLog: obsEntity.qcTestLog,
+                log: this.createViewLog(obsEntity),
+                entryDatetime: obsEntity.entryDateTime.toISOString(),
+            };
+            obsView.push(viewObs);
+        }
+        return obsView;
+    }
+
+    private createViewLog(entity: ObservationEntity): ViewObservationLogDto[] {
+        const viewLogDto: ViewObservationLogDto[] = [];
+        let user: ViewUserDto | undefined;
+        if (entity.log) {
+            for (const logItem of entity.log) {
+                user = this.usersService.findOne(logItem.entryUserId);
+                viewLogDto.push({
+                    value: logItem.value,
+                    flag: logItem.flag,
+                    qcStatus: logItem.qcStatus,
+                    comment: logItem.comment,
+                    deleted: logItem.deleted,
+                    entryUserName: user ? user.name : '',
+                    entryUserEmail: user ? user.email : '',
+                    entryDateTime: logItem.entryDateTime,
+                });
+            }
+        }
+
+        // Include the current values as log.
+        // Important because present values should be part of the record history
+        user = this.usersService.findOne(entity.entryUserId);
+        const currentValuesAsLogObj: ViewObservationLogDto = {
+            value: entity.value,
+            flag: entity.flag,
+            qcStatus: entity.qcStatus,
+            comment: entity.comment,
+            deleted: entity.deleted,
+            entryUserName: user ? user.name : '',
+            entryUserEmail: user ? user.email : '',
+            entryDateTime: entity.entryDateTime.toISOString()
+        }
+
+        viewLogDto.push(currentValuesAsLogObj);
+        return viewLogDto;
+    }
+
+    /**
+     * Counts the number of records needed to be saved to V4.
+     * Important note. Maximum count is 1,000,001 to limit compute needed
+     * @returns 
+     */
+    public async countObservationsNotSavedToV4(): Promise<number> {
+        return this.observationRepo.count({
+            where: { savedToV4: false },
+            take: 1000001, // Important. Limit to 1 million and 1 for performance reasons
+        });
+    }
+
     /**
      * 
      * @param createObservationDtos 
@@ -252,7 +217,7 @@ export class ObservationsService {
      * @param ignoreV4Saving When true, observations will be indicated as already saved to v4 and they will not be uploaded to version 4 databse
      */
     public async bulkPut(createObservationDtos: CreateObservationDto[], userId: number, qcStatus = QCStatusEnum.NONE, ignoreV4Saving: boolean = false): Promise<void> {
-        let startTime = new Date().getTime();
+        let startTime: number = Date.now();
 
         // Transform dtos to entities
         const obsEntities: ObservationEntity[] = [];
@@ -267,7 +232,7 @@ export class ObservationsService {
                 value: dto.value,
                 flag: dto.flag,
                 qcStatus: qcStatus,
-                comment: dto.comment,
+                comment: dto.comment ? dto.comment : null,
                 entryUserId: userId,
                 deleted: false,
                 savedToV4: ignoreV4Saving,
@@ -275,55 +240,53 @@ export class ObservationsService {
 
             obsEntities.push(entity);
         }
-        this.logger.log(`DTO transformation took: ${(new Date().getTime() - startTime)} milliseconds`);
+        this.logger.log(`DTO transformation took: ${(Date.now() - startTime)} milliseconds`);
 
         // Save in batches of 1000 to minimise excess payload errors when saving to postgres
         this.logger.log(`Saving ${obsEntities.length} entities from user - ${userId}`);
-        startTime = new Date().getTime();
+        startTime = Date.now();
         const batchSize = 1000; // batch size of 1000 seems to be safer (incase there are comments) and faster.
         for (let i = 0; i < obsEntities.length; i += batchSize) {
             const batch = obsEntities.slice(i, i + batchSize);
-            await this.insertOrUpdateObsValues(this.observationRepo, batch);
+            //await this.insertOrUpdateObsValues(this.observationRepo, batch);
+
+
+            await this.observationRepo
+                .createQueryBuilder()
+                .insert()
+                .into(ObservationEntity)
+                .values(batch)
+                .orUpdate(
+                    [
+                        "value",
+                        "flag",
+                        "qc_status",
+                        "comment",
+                        "deleted",
+                        "saved_to_v4",
+                        "entry_user_id",
+                    ],
+                    [
+                        "station_id",
+                        "element_id",
+                        "level",
+                        "source_id",
+                        "date_time",
+                        "interval",
+                    ],
+                    {
+                        skipUpdateIfNoValuesChanged: true,
+                    }
+                )
+                .execute();
+
+
             this.logger.log(`${batch.length} entities from user - ${userId} successfully saved!`);
         }
-        this.logger.log(`Saving entities from user - ${userId}, took: ${(new Date().getTime() - startTime)} milliseconds`);
+        this.logger.log(`Saving entities from user - ${userId}, took: ${(Date.now() - startTime)} milliseconds`);
 
-        if (!ignoreV4Saving) {
-            // Initiate saving to version 4 database as well
-            this.climsoftV4Service.saveWebObservationstoV4DB();
-        }
+        this.eventEmitter.emit('observations.saved');
 
-    }
-
-    private async insertOrUpdateObsValues(observationRepo: Repository<ObservationEntity>, observationsData: ObservationEntity[]) {
-        return observationRepo
-            .createQueryBuilder()
-            .insert()
-            .into(ObservationEntity)
-            .values(observationsData)
-            .orUpdate(
-                [
-                    "value",
-                    "flag",
-                    "qc_status",
-                    "comment",
-                    "deleted",
-                    "saved_to_v4",
-                    "entry_user_id",
-                ],
-                [
-                    "station_id",
-                    "element_id",
-                    "level",
-                    "source_id",
-                    "date_time",
-                    "interval",
-                ],
-                {
-                    skipUpdateIfNoValuesChanged: true,
-                }
-            )
-            .execute();
     }
 
     public async softDelete(obsDtos: DeleteObservationDto[], userId: number): Promise<number> {
@@ -358,7 +321,7 @@ export class ObservationsService {
             .whereInIds(compositeKeys)
             .execute();
 
-        this.climsoftV4Service.saveWebObservationstoV4DB();
+        this.eventEmitter.emit(deletedStatus ? 'observations.deleted' : 'observations.restored');
 
         // If affected results not supported then just return the dtos length.
         // Note, affected results will always be defined because the API uses postgres.
@@ -388,7 +351,7 @@ export class ObservationsService {
 
     // NOTE. Left here for future reference. In fututure we want to be able to delete by station id and source id. 
     // This will be useful code to reuse.
-    public async hardDeleteBy(deleteObsDtos: DeleteObservationDto[]): Promise<number> {
+    private async hardDeleteBy(deleteObsDtos: DeleteObservationDto[]): Promise<number> {
         let succesfulChanges: number = 0;
         for (const dto of deleteObsDtos) {
             const result = await this.observationRepo.createQueryBuilder()
@@ -487,7 +450,7 @@ export class ObservationsService {
         }
 
         // TODO. this setting should be retrived from the cache
-        const utcOffset: number = ((await this.generalSettingsService.find(SettingIdEnum.DISPLAY_TIME_ZONE)).parameters as ClimsoftDisplayTimeZoneDto).utcOffset
+        const utcOffset: number = ((await this.generalSettingsService.findOne(SettingIdEnum.DISPLAY_TIME_ZONE)).parameters as ClimsoftDisplayTimeZoneDto).utcOffset
         const strTimeZone: string = `'UTC+${utcOffset}'`;
 
         switch (filter.durationType) {
@@ -507,7 +470,7 @@ export class ObservationsService {
                 throw new BadRequestException('Duration type not supported');
         }
 
-        // TODO. use parameterised queries
+        // TODO. Change this to use a postgres function and use parameterised values
         const sql = `
             SELECT station_id, COUNT(element_id) AS record_count, ${sqlExtract} FROM observations 
             WHERE ${sqlCondition} 
@@ -597,7 +560,7 @@ export class ObservationsService {
                 comment: obsEntity.comment,
                 qcStatus: obsEntity.qcStatus,
                 qcTestLog: null,
-                log: null,
+                log: [],
                 entryDatetime: obsEntity.entryDateTime.toISOString()
             };
             obsView.push(viewObs);

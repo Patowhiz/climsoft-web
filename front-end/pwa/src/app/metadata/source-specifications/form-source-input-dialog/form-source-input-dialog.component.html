@@ -1,0 +1,120 @@
+<ng-container *ngIf="open && viewSource">
+    <app-dialog [(open)]="open" [title]="title" [okButtonLabel]="'Submit'" [displayDeleteOption]="viewSource.id > 0"
+        [closeOnOkClick]="false" [closeOnDeleteClick]="false" (okClick)="onSave()" (deleteClick)="onDelete()">
+
+        <div>
+            <app-text-input [label]="'Name'" [(value)]="viewSource.name" />
+        </div>
+
+        <hr />
+
+        <div>
+            <app-text-input [label]="'Description'" [(value)]="viewSource.description" />
+        </div>
+
+        <hr />
+
+        <div>
+            <app-selector-multiple-input [label]="'Extra Selectors'" [errorMessage]="selectorsErrorMessage"
+                [options]="possibleSelectors" [selectedOptions]="selectedSelectors"
+                (selectedOptionsChange)="onSelectorsSelected($event)" />
+        </div>
+
+        <hr />
+
+        <div>
+            <app-selector-multiple-input [label]="'Fields'" [errorMessage]="fieldsErrorMessage"
+                [options]="possibleFields" [selectedOptions]="selectedFields"
+                (selectedOptionsChange)="onFieldsSelected($event)" />
+        </div>
+
+        <hr />
+
+        <div>
+            <app-text-input [label]="'Layout'" [disabled]="true" [value]="selectedLayout" />
+        </div>
+
+        <hr />
+
+        <div>
+            <app-element-selector-multiple [label]="'Element(s)'" [errorMessage]="elementsErrorMessage"
+                [(selectedIds)]="selectedElementIds" />
+        </div>
+
+        <hr />
+
+        <div>
+            <app-interval-selector-single [label]="'Interval'" [includeOnlyIds]="[60, 180, 360, 720, 1440, 2880]"
+                [selectedId]="selectedIntervalId" (selectedIdChange)="onIntervalSelected($event)" />
+
+        </div>
+
+        <hr />
+
+        <div>
+            <app-hour-multiple-input [label]="'Hour(s)'" [errorMessage]="hoursErrorMessage"
+                [selectedIds]="selectedHourIds" (selectedIdsChange)="onHoursSelected($event)" />
+        </div>
+
+        <hr />
+
+        <div>
+            <app-number-input [label]="'UTC Offset'" [(numValue)]="utcOffset" />
+        </div>
+
+
+        <hr />
+
+        <div>
+            <app-check-box-input [label]="'Allow Missing Values'" [(value)]="allowMissingValue" />
+        </div>
+
+        <hr />
+
+        <div>
+            <app-check-box-input [label]="'Require Total Input'" [(value)]="requireTotalInput" />
+        </div>
+
+        <hr />
+
+        <div>
+            <app-check-box-input [label]="'Restrict Entry At Station Location Only'"
+                [(value)]="allowEntryAtStationOnly" />
+        </div>
+
+        <hr />
+
+        <div>
+            <app-check-box-input [label]="'Allow Station Selection'" [(value)]="allowStationSelection" />
+        </div>
+
+        <hr />
+
+        <div>
+            <app-check-box-input [label]="'Allow Double Data Entry'" [(value)]="allowDoubleDataEntry" />
+        </div>
+
+        <hr />
+
+        <div>
+            <app-check-box-input [label]="'Disable'" [(value)]="viewSource.disabled" />
+        </div>
+
+        <hr />
+
+        <div>
+            <app-text-input [label]="'Comment'" [(value)]="viewSource.comment" />
+        </div>
+
+        <div *ngIf="errorMessage">
+            <hr />
+            <div class="text-danger">
+                {{ errorMessage }}
+            </div>
+        </div>
+
+    </app-dialog>
+
+    <app-delete-confirmation-dialog #dlgDeleteConfirm [itemName]="viewSource.name"
+        [itemType]="'form specification'" (deleteConfirmed)="onDeleteConfirm()" />
+</ng-container>

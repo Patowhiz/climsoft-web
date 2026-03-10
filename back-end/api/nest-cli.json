@@ -7,7 +7,11 @@
     "assets": [
       {
         "include": "sql-scripts/**/*.sql",
-        "watchAssets": true 
+        "watchAssets": true
+      },
+      {
+        "include": "observation/services/**/*.json",
+        "watchAssets": true
       }
     ]
   }

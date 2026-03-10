@@ -11,8 +11,6 @@ export interface NetworkAffiliationCacheModel {
     id: number;
     name: string;
     description: string;
-    parentNetworkId: number;
-    parentNetworkName: string;
     extraMetadata: string;
     comment: string;
 }
@@ -23,7 +21,8 @@ export interface NetworkAffiliationCacheModel {
 export class NetworkAffiliationsCacheService {
     private endPointUrl: string;
     private readonly _cachedNetworkAffiliations: BehaviorSubject<NetworkAffiliationCacheModel[]> = new BehaviorSubject<NetworkAffiliationCacheModel[]>([]);
-    private checkUpdatesSubscription: Subscription = new Subscription();
+    private checkUpdatesSubscription: Subscription = new Subscription(); // Deprecate this
+    private checkingForUpdates: boolean = false;
     constructor(
         private appConfigService: AppConfigService,
         private metadataUpdatesService: MetadataUpdatesService,
@@ -36,20 +35,12 @@ export class NetworkAffiliationsCacheService {
         const networksFromServer: ViewNetworkAffiliationModel[] = await AppDatabase.instance.networkAffiliations.toArray();
         const newCachedNetworks: NetworkAffiliationCacheModel[] = [];
         for (const network of networksFromServer) {
-            let parentNetworkName = '';
-            if (network.parentNetworkId) {
-                const networkFromServer = networksFromServer.find(item => item.id === network.parentNetworkId);
-                if (networkFromServer) parentNetworkName = networkFromServer.name;
-            }
-
             newCachedNetworks.push({
                 id: network.id,
                 name: network.name,
-                description: network.description ? network.description : '',
-                parentNetworkId: network.parentNetworkId ? network.parentNetworkId : 0,
-                parentNetworkName: parentNetworkName,
-                extraMetadata: network.extraMetadata ? network.extraMetadata : '',
-                comment: network.comment ? network.comment : '',
+                description: network.description || '',
+                extraMetadata: network.extraMetadata || '',
+                comment: network.comment || '',
             });
         }
 
@@ -57,13 +48,21 @@ export class NetworkAffiliationsCacheService {
     }
 
     public checkForUpdates(): void {
+        // If still checking for updates just return
+        if (this.checkingForUpdates) return;
         console.log('checking network-affiliations updates');
         this.checkUpdatesSubscription.unsubscribe();
-        this.checkUpdatesSubscription = this.metadataUpdatesService.checkUpdates('networkAffiliations').subscribe(res => {
-            console.log('network-affiliations-cache response', res);
-            if (res) {
-                this.loadNetworkAffiliations();
-            }
+        this.checkUpdatesSubscription = this.metadataUpdatesService.checkUpdates('networkAffiliations').subscribe({
+            next: res => {
+                console.log('network-affiliations-cache response', res);
+                this.checkingForUpdates = false;
+                if (res) {
+                    this.loadNetworkAffiliations();
+                }
+            },
+            error: err => {
+                this.checkingForUpdates = false;
+            },
         });
     }
 

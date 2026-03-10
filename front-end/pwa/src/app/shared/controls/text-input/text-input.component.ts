@@ -6,12 +6,12 @@ import { Component, Input, Output, EventEmitter, ViewChild, ElementRef } from '@
   styleUrls: ['./text-input.component.scss']
 })
 export class TextInputComponent {
-  @ViewChild('appHtmlInput') inputElRef!: ElementRef;
+  @ViewChild('appHtmlInput', { read: ElementRef }) inputElRef!: ElementRef;
 
   @Input() public displayDropDownOption: boolean = false;
   @Input() public dropDownOptionMaxHeight: number = 200;
   @Output() public displayDropDownOptionClick = new EventEmitter<void>();
-
+  @Output() public dropDownDisplayed = new EventEmitter();
 
   @Input() public displayExtraInfoOption: boolean = false;
   @Output() public displayExtraInfoOptionClick = new EventEmitter<void>();
@@ -19,20 +19,25 @@ export class TextInputComponent {
   @Input() public displaySearchOption: boolean = false;
   @Output() public displaySearchOptionClick = new EventEmitter<void>();
 
+  @Input() public displaySettingOption: boolean = false;
+  @Output() public displaySettingOptionClick = new EventEmitter<void>();
+
   @Input() public displayCancelOption: boolean = false;
   @Output() public displayCancelOptionClick = new EventEmitter<void>();
 
   @Input() public type: string = 'text';
   @Input() public id!: string | number;
   @Input() public label!: string;
+  @Input() public labelSuperScript!: string | undefined;
+  @Input() public displaylabelFullColon: boolean = true;
   @Input() public placeholder!: string;
   @Input() public borderSize: number = 1;
   @Input() public disabled: boolean = false;
   @Input() public readonly: boolean = false;
   @Input() public showChanges: boolean = false;
-  @Input() public hintMessage: string | null | undefined; // TODO. Null not needed
-  @Input() public errorMessage: string | null | undefined; // TODO. Null not needed
-  @Input() public warningMessage: string | undefined;
+  @Input() public hintMessage!: string;
+  @Input() public errorMessage!: string;
+  @Input() public warningMessage!: string;
   @Input() public value: string | number | null | undefined = '';
   @Input() public simulateTabOnEnter: boolean = true;
 
@@ -42,9 +47,10 @@ export class TextInputComponent {
   @Output() public inputBlur = new EventEmitter<string>();
 
 
+
   // For Year-month, date and number controls control
-  @Input() public max: string | number | undefined;
-  @Input() public min: string | number | undefined;
+  @Input() public max!: string | number;
+  @Input() public min!: string | number;
 
   protected displayDropDown: boolean = false;
 
@@ -52,18 +58,21 @@ export class TextInputComponent {
     this.inputElRef.nativeElement.focus();
   }
 
-  public showDropDown(showDropDrown: boolean) {
-    this.displayDropDown = showDropDrown;
+  public showDropDown(displayDropDown: boolean) {
+    this.displayDropDown = displayDropDown;
+    if (this.displayDropDown) {
+      this.dropDownDisplayed.emit();
+    }
   }
 
   protected onValueChange(value: string): void {
     this.value = value;
-    this.valueChange.emit(value);
+    this.valueChange.emit(this.value);
   }
 
   protected onInputClick(): void {
     if (this.displayDropDownOption) {
-      this.displayDropDown = true;
+      this.showDropDown(!this.displayDropDown);
     }
     this.inputClick.emit(this.value ? this.value.toString() : '');
   }
@@ -97,6 +106,10 @@ export class TextInputComponent {
 
   protected onDisplaySearchClick(): void {
     this.displaySearchOptionClick.emit();
+  }
+
+  protected onDisplaySettingClick(): void {
+    this.displaySettingOptionClick.emit();
   }
 
 }

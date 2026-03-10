@@ -1,69 +1,80 @@
-import { IsDateString, IsEnum, IsInt, IsNumber, IsOptional, IsString } from 'class-validator';
+import { IsDateString, IsEnum, IsInt, IsNotEmpty, IsNumber, IsOptional, IsString, Min } from 'class-validator';
 import { StationStatusEnum } from '../enums/station-status.enum';
 import { StationObsProcessingMethodEnum } from '../enums/station-obs-processing-method.enum';
 
 export class UpdateStationDto {
     @IsString()
+    @IsNotEmpty()
     name: string;
 
     @IsOptional()
     @IsString()
-    description: string | null;
+    description?: string;
 
     @IsOptional()
     @IsNumber()
-    longitude: number | null;
+    longitude?: number;
 
     @IsOptional()
     @IsNumber()
-    latitude: number | null;
+    latitude?: number;
 
     @IsOptional()
     @IsNumber()
-    elevation: number | null; //from and to. Elevation of station above mean sea level.  todo. discuss on oscar and openCDMS
+    elevation?: number; // Elevation of station above mean sea level. 
 
+    @IsOptional()
     @IsEnum(StationObsProcessingMethodEnum, { message: 'Station observing method must be a valid value' })
-    stationObsProcessingMethod: StationObsProcessingMethodEnum;
+    stationObsProcessingMethod?: StationObsProcessingMethodEnum;
 
     @IsOptional()
     @IsInt()
-    stationObsEnvironmentId: number | null;
+    @Min(1)
+    stationObsEnvironmentId?: number;
 
     @IsOptional()
     @IsInt()
-    stationObsFocusId: number | null;
+    @Min(1)
+    stationObsFocusId?: number;
 
     @IsOptional()
     @IsInt()
-    organisationId: number | null;
+    @Min(1)
+    ownerId?: number;
+
+    @IsOptional()
+    @IsInt()
+    @Min(1)
+    operatorId?: number;
+
+    @IsOptional()
+    @IsString() // TODO. Add validation for WMO station identifier
+    @IsNotEmpty()
+    wmoId?: string;
+
+    @IsOptional()
+    @IsString() // TODO. Add validation for WMO wigos station identifier
+    @IsNotEmpty()
+    wigosId?: string;
 
     @IsOptional()
     @IsString()
-    wmoId: string | null;
-
-    @IsOptional()
-    @IsString()
-    wigosId: string | null;
-
-    @IsOptional()
-    @IsString()
-    icaoId: string | null;
+    @IsNotEmpty()
+    icaoId?: string;
 
     @IsOptional()
     @IsEnum(StationStatusEnum, { message: 'Station status must be a valid value' })
-    status: StationStatusEnum | null;
+    status?: StationStatusEnum;
 
     @IsOptional()
     @IsDateString()
-    dateEstablished: string | null;
+    dateEstablished?: string;
 
     @IsOptional()
     @IsDateString()
-    dateClosed: string | null;
+    dateClosed?: string;
 
     @IsOptional()
     @IsString()
-    comment: string | null;
-
+    comment?: string;
 }
-

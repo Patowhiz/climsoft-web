@@ -45,6 +45,14 @@ export class PageInputComponent implements OnChanges {
     }
   }
 
+  protected get firstRecord(): number {
+    return (this.pageInputDefinition.page - 1) * this.pageInputDefinition.pageSize + 1;
+  }
+
+  protected get lastRecord(): number {
+    return Math.min(this.pageInputDefinition.page * this.pageInputDefinition.pageSize, this.pageInputDefinition.totalRowCount);
+  }
+
   protected closeVisibleRowsDropDown(): void {
     this.displayVisibleRowsDropDown = false;
   }
@@ -54,7 +62,7 @@ export class PageInputComponent implements OnChanges {
   }
 
   protected onPageSizeSelection(pageSizeSelection: string): void {
-    this.pageInputDefinition.setPageSize(pageSizeSelection === '31' ? 31 : 365)
+    this.pageInputDefinition.setPageSize(Number(pageSizeSelection))
     this.closeVisibleRowsDropDown();
     this.pageInputDefinitionChange.emit();
   }

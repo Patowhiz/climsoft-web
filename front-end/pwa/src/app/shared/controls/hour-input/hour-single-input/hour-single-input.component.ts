@@ -11,12 +11,12 @@ interface Hour {
   templateUrl: './hour-single-input.component.html',
   styleUrls: ['./hour-single-input.component.scss']
 })
-export class HourSingleInputComponent implements OnInit, OnChanges {
+export class HourSingleInputComponent implements OnChanges {
   @Input() public label: string = 'Hour';
   @Input() public errorMessage: string = '';
   @Input() public includeOnlyIds!: number[];
   @Input() public showNavigationButtons!: boolean;
-  @Input() public selectedId!: number | null;
+  @Input() public selectedId!: number | null | undefined;
   @Output() public selectedIdChange = new EventEmitter<number | null>();
 
   protected options!: Hour[];
@@ -24,9 +24,6 @@ export class HourSingleInputComponent implements OnInit, OnChanges {
 
   constructor() {
 
-  }
-
-  ngOnInit(): void {
   }
 
   ngOnChanges(changes: SimpleChanges): void {

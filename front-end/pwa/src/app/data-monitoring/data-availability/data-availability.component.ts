@@ -7,9 +7,9 @@ import { CachedMetadataService } from 'src/app/metadata/metadata-updates/cached-
 import { DataAvailabilityDetailsQueryModel } from './models/data-availability-details-query.model';
 import { DurationTypeEnum } from './models/duration-type.enum';
 import { DateUtils } from 'src/app/shared/utils/date.utils';
-import { DataAvailabilityFilterModel } from './data-availability-query-selection/data-availability-filter-selection-general/data-availability-filter-selection-general.component';
 import { AppAuthService } from 'src/app/app-auth.service';
 import { StationCacheModel } from 'src/app/metadata/stations/services/stations-cache.service';
+import { DataAvailabilityFilterModel } from './data-availability-filter-selection-general/data-availability-filter-selection-general.component';
 
 // TODO. This component needs more refactoring.
 
@@ -127,8 +127,6 @@ export class DataAvailabilityComponent implements OnInit, OnDestroy {
 
       // Get stations that are operational and have locations only
       this.stationsPermitted = stations;
-
-      console.log('stations permitted: ', this.stationsPermitted)
 
     });
   }

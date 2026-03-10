@@ -2,6 +2,7 @@ import { Component, Input, OnChanges, SimpleChanges } from '@angular/core';
 import * as L from 'leaflet';
 import { StationCacheModel } from 'src/app/metadata/stations/services/stations-cache.service';
 import { StationStatusEnum } from '../../models/station-status.enum';
+import { CachedMetadataService } from 'src/app/metadata/metadata-updates/cached-metadata.service';
 
 @Component({
   selector: 'app-view-stations-geo-map',
@@ -9,7 +10,8 @@ import { StationStatusEnum } from '../../models/station-status.enum';
   styleUrls: ['./view-stations-geo-map.component.scss']
 })
 export class ViewStationsGeoMapComponent implements OnChanges {
-  @Input() public mapHeight: string = '80vh';  
+  @Input() public mapHeight: string = '80vh';
+  @Input() public stationIds!: string[];
   @Input() public stations!: StationCacheModel[];
   @Input() public displayStats: boolean = true;
 
@@ -21,10 +23,15 @@ export class ViewStationsGeoMapComponent implements OnChanges {
   protected numOfClosedStations!: number;
   protected numOfUnknownStations!: number;
 
-  constructor() {
+  constructor(private cachedMetadataService: CachedMetadataService) {
   }
 
   ngOnChanges(changes: SimpleChanges): void {
+    if (changes['stationIds'] && this.stationIds) {
+      this.stations = this.cachedMetadataService.stationsMetadata.filter(station => this.stationIds.includes(station.id));
+      this.setupMap();
+    }
+
     if (changes['stations'] && this.stations) {
       this.setupMap();
     }
@@ -49,11 +56,9 @@ export class ViewStationsGeoMapComponent implements OnChanges {
         case StationStatusEnum.CLOSED:
           this.numOfClosedStations = this.numOfClosedStations + 1;
           break;
-        case StationStatusEnum.UKNOWNN:
+        default:
           this.numOfUnknownStations = this.numOfUnknownStations + 1;
           break;
-        default:
-          throw new Error(`Developer error: Station with unrecognised status: ${station.id}`);
       }
 
     }
@@ -95,11 +100,9 @@ export class ViewStationsGeoMapComponent implements OnChanges {
       case StationStatusEnum.CLOSED:
         colorValue = '#C6C6C6';//'#1330BF'; 
         break;
-      case StationStatusEnum.UKNOWNN:
+      default:
         colorValue = '#F73E25';
         break;
-      default:
-        throw new Error(`Developer error: Station status unknown: ${station.id}`);
     }
 
     //console.log("latlong", latlng, feature);

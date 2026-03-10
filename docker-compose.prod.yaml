@@ -1,7 +1,7 @@
 
 services:
   climsoft_nginx_proxy:
-    image: climsoftdevelopers/climsoft-nginx-proxy:preview-2.0.3
+    image: climsoftdevelopers/climsoft-nginx-proxy:preview-3.0.0
     container_name: climsoft-nginx-proxy
     restart: always
     ports: # Expose to external network
@@ -13,7 +13,7 @@ services:
       - climsoft_network
 
   climsoft_pwa:
-    image: climsoftdevelopers/climsoft-pwa:preview-2.0.3
+    image: climsoftdevelopers/climsoft-pwa:preview-3.0.0
     container_name: climsoft-pwa
     restart: always
     environment:
@@ -27,7 +27,7 @@ services:
       - climsoft_network
 
   climsoft_api:
-    image: climsoftdevelopers/climsoft-api:preview-2.0.3
+    image: climsoftdevelopers/climsoft-api:preview-3.0.0
     container_name: climsoft-api
     restart: always
     environment:
@@ -45,11 +45,25 @@ services:
       V4_DB_USERNAME: "${V4_DB_USERNAME}"
       V4_DB_PASSWORD: "${V4_DB_PASSWORD}"
       V4_DB_UTCOFFSET: "${V4_DB_UTCOFFSET}"
-    expose: 
+      CSV2BUFR_HOST: climsoft_csv2bufr
+      CSV2BUFR_PORT: 5001
+    expose:
       - 3000 # Expose to internal network only. Communication to the API can go through the nginx reverse proxy.
     depends_on:
       climsoft_db:
         condition: service_healthy # Wait until climsoft_db is healthy as indicate by healthcheck
+    volumes:
+      - climsoft_imports:/app/imports
+      - climsoft_exports:/app/exports
+    networks:
+      - climsoft_network
+
+  climsoft_csv2bufr:
+    image: climsoftdevelopers/climsoft-csv2bufr:preview-3.0.0
+    container_name: climsoft-csv2bufr
+    restart: always
+    expose:
+      - 5001 # Expose to internal network only.
     volumes:
       - climsoft_exports:/app/exports
     networks:
@@ -63,15 +77,16 @@ services:
       POSTGRES_DB: "${DB_NAME}" # Default database postgres will create, required when setting up postgres the first time.
       POSTGRES_USER: postgres # Uses the default postgres username for simplicity, required when setting up postgres the first time.
       POSTGRES_PASSWORD: "${DB_PASSWORD}" # Super user password, required when setting up postgres the first time.
-    ports: 
+    ports:
       - "5432:5432" # Expose to both external and internal network.
     volumes:
       - climsoft_database:/var/lib/postgresql/data
+      - climsoft_imports:/var/lib/postgresql/imports
       - climsoft_exports:/var/lib/postgresql/exports
     networks:
       - climsoft_network
     # Recursively change the ownership of the /var/lib/postgresql/exports directory and all its contents to user postgres and group postgres.
-    # The executes the default PostGIS/PostgreSQL startup entrypoint, passing postgres as the command to run the Postgres server.
+    # Then execute the default PostGIS/PostgreSQL startup entrypoint, passing postgres as the command to run the Postgres server.
     command: >
       sh -c "chown -R postgres:postgres /var/lib/postgresql/exports 
       && docker-entrypoint.sh postgres"
@@ -83,6 +98,7 @@ services:
 
 volumes:
   climsoft_database:
+  climsoft_imports:
   climsoft_exports:
 
 networks:

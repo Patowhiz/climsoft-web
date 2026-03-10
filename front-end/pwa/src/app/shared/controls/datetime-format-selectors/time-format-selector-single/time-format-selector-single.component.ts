@@ -1,5 +1,5 @@
 import { Component, Input, Output, EventEmitter, SimpleChanges, OnChanges } from '@angular/core';
-import { TimeFormatTypes } from 'src/app/metadata/source-templates/models/create-import-source-tabular.model';
+import { TimeFormatTypes } from 'src/app/metadata/source-specifications/models/import-source-tabular-params.model';
 
 @Component({
   selector: 'app-time-format-selector-single',
@@ -21,6 +21,9 @@ export class TimeFormatSelectorSingleComponent implements OnChanges {
     this.options = [
       '%H:%M:%S',
       '%H:%M',
+      '%-H:%M',
+      '%H',
+      '%-H'
     ];
   }
 
@@ -35,8 +38,16 @@ export class TimeFormatSelectorSingleComponent implements OnChanges {
     }
   }
 
-  protected optionDisplayFunction(option: TimeFormatTypes): string {
-    return option;
+  private readonly displayLabels: Record<TimeFormatTypes, string> = {
+    '%H:%M:%S': '14:30:00 (%H:%M:%S)',
+    '%H:%M': '14:30 (%H:%M)',
+    '%-H:%M': '9:30 (%-H:%M, no padding)',
+    '%H': '14 (%H, zero-padded)',
+    '%-H': '9 (%-H, no padding)',
+  };
+
+  protected optionDisplayFunction = (option: TimeFormatTypes): string => {
+    return this.displayLabels[option] ?? option;
   }
 
   protected onSelectedOptionChange(selectedOption: TimeFormatTypes | null) {

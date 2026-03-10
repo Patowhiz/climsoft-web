@@ -1,26 +1,23 @@
-<div *ngIf="networkAffiliations" class="card border-0">
+<div class="card border-0">
   <div class="card-header d-flex justify-content-end align-items-center px-1 py-0">
 
     <div class="d-flex align-items-center">
-      <div class="d-flex mx-2">
-        Count: {{ networkAffiliations.length | number:'1.0-0' }}
+      <button *ngIf="isSystemAdmin" type="button" class="btn btn-outline-secondary btn-sm"
+        (click)="onOptionsClicked('Add')">
+        Add
+      </button>
+      <div *ngIf="isSystemAdmin" class="ms-2">
+        <app-drop-down-button [buttonText]="'Options'" [dropDownItems]="['Delete All']"
+          (dropDownOptionClick)="onOptionsClicked('Delete All')" [offSetRight]="true" />
       </div>
-      <!-- <button type="button" class="btn btn-outline-secondary btn-sm me-2 " (click)="onSearch()">
-        Search
-      </button> -->
-      <div>
-        <app-drop-down-button [buttonText]="'Options'" [dropDownItems]="dropDownItems"
-          (dropDownOptionClick)="onOptionsClicked($event)" [offSetRight]="true" />
+      <div class="ms-2">
+        <app-page-input [pageInputDefinition]="pageInputDefinition" (pageInputDefinitionChange)="0" />
       </div>
-
-      <!-- <app-import-regions-dialog [open]="optionClicked === 'Import'" (ok)="onOptionsDialogClosed()"
-        (cancelClick)="onOptionsDialogClosed()" /> -->
-
     </div>
   </div>
 
   <div class="card-body px-0">
-    <div class="app-table-container" style="height: 80vh;">
+    <div class="app-table-container" style="max-height: 80vh;">
       <table class="table table-hover table-sm">
         <colgroup>
           <col style="width: 2%;" />
@@ -28,22 +25,23 @@
         <thead>
           <tr>
             <th></th>
-            <th>Name</th>
-            <th>Description</th>
-            <th>Parent Network</th>
+            <th appSortableHeader="name" [sortColumn]="sortColumn" [sortDirection]="sortDirection"
+              (sort)="onSort($event)">Name</th>
+            <th appSortableHeader="description" [sortColumn]="sortColumn" [sortDirection]="sortDirection"
+              (sort)="onSort($event)">Description</th>
             <th></th>
           </tr>
         </thead>
         <tbody>
-          <tr class="app-cursor-pointer" *ngFor="let network of networkAffiliations">
-            <td (click)="onEditNetworkAffiliation(network)"><i class="bi bi-arrow-right-short"></i></td>
-            <td (click)="onEditNetworkAffiliation(network)">{{ network.name }}</td>
-            <td (click)="onEditNetworkAffiliation(network)">{{ network.description }}</td>
-            <td (click)="onEditNetworkAffiliation(network)">{{ network.parentNetworkName }}</td>
+          <tr class="app-cursor-pointer" *ngFor="let network of pageItems"
+            (click)="onEditNetworkAffiliation(network, $event)">
+            <td><i class="bi bi-arrow-right-short"></i></td>
+            <td>{{ network.name }}</td>
+            <td>{{ network.description }}</td>
             <td>
               <div class="d-flex align-items-center">
                 <button type="button" class="btn btn-outline-secondary btn-sm"
-                  (click)="onAssignStationsClicked(network)">Assign Stations</button>
+                  (click)="onAssignStationsClicked(network, $event)">Assign Stations</button>
                 <div class="ms-2">{{ network.assignedStations }}</div>
               </div>
             </td>
@@ -51,7 +49,13 @@
         </tbody>
       </table>
     </div>
-    <app-stations-search-dialog #appSearchAssignedStations
-      (searchedIdsChange)="onAssignNetworkToStationsInput($event)" />
   </div>
+
+  <app-stations-search-dialog #appSearchAssignedStations (searchedIdsChange)="onAssignNetworkToStationsInput($event)" />
+
+  <app-network-affiliation-input-dialog #dlgNetworkDetails />
+
+  <app-delete-confirmation-dialog #dlgDeleteAllConfirm [itemName]="'All'" [itemType]="'network affiliation'"
+    (deleteConfirmed)="onDeleteAllConfirm()" />
+
 </div>

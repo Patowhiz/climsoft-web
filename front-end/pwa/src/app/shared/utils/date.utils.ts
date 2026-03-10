@@ -93,21 +93,31 @@ export class DateUtils {
         }
     }
 
-    public static getPresentableDatetime(strDateTimeInJavaScriptIso: string, utcOffset: number): string {
-        if (utcOffset === 0) {
-            return strDateTimeInJavaScriptIso.replace('T', ' ').
-                replace('Z', '').replace(':00', '').replace('.000', '');
+    public static getPresentableDatetime(strDateTimeInJavaScriptIso: string, utcOffset: number, removeSeconds: boolean = true): string {
+        let dateTimeStr = strDateTimeInJavaScriptIso;
+
+        if (utcOffset !== 0) {
+            dateTimeStr = DateUtils.getDatetimesBasedOnUTCOffset(strDateTimeInJavaScriptIso, utcOffset, 'add');
         }
 
-        // Will subtract the offset to get UTC time if local time is ahead of UTC and add the offset to get UTC time if local time is behind UTC
-        // Note, it's addition and NOT subtraction because this is meant to display the datetime NOT submiting it
-        // const dateAdjusted = new Date(strDateTimeInJavaScriptIso);
-        //dateAdjusted.setHours(dateAdjusted.getHours() + utcOffset);
+        // Replace 'T' with space
+        dateTimeStr = dateTimeStr.replace('T', ' ');
 
-        //return dateAdjusted.toISOString().replace('T', ' ').replace('Z', '');
-        return DateUtils.getDatetimesBasedOnUTCOffset(
-            strDateTimeInJavaScriptIso, utcOffset, 'add'
-        ).replace('T', ' ').replace('Z', '').replace(':00', '').replace('.000', '');
+        // Remove milliseconds and 'Z'
+        const dotIndex = dateTimeStr.indexOf('.');
+        if (dotIndex !== -1) {
+            dateTimeStr = dateTimeStr.substring(0, dotIndex);
+        }
+
+        if (removeSeconds) {
+            // Remove seconds part (:ss)
+            const parts = dateTimeStr.split(':');
+            if (parts.length === 3) {
+                dateTimeStr = `${parts[0]}:${parts[1]}`;
+            }
+        }
+
+        return dateTimeStr;
     }
 
     public static getDatetimesBasedOnUTCOffset(strDateTimeInJavaScriptIso: string, utcOffset: number, operation: 'subtract' | 'add'): string {
@@ -118,7 +128,7 @@ export class DateUtils {
         } else {
             newDate.setHours(newDate.getHours() + utcOffset);
         }
-        
+
         return newDate.toISOString();
     }
 
@@ -151,5 +161,3 @@ export class DateUtils {
     }
 
 }
-
-

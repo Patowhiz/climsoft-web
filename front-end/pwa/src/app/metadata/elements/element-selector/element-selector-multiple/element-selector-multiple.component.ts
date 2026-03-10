@@ -8,28 +8,22 @@ import { ElementCacheModel, ElementsCacheService } from 'src/app/metadata/elemen
   styleUrls: ['./element-selector-multiple.component.scss']
 })
 export class ElementSelectorMultipleComponent implements OnChanges, OnDestroy {
-  @Input()
-  public id!: string;
-  @Input()
-  public label!: string;
-  @Input()
-  public placeholder!: string;
-  @Input()
-  public errorMessage!: string;
-  @Input()
-  public includeOnlyIds!: number[];
-  @Input()
-  public selectedIds: number[] = [];
-  @Output()
-  public selectedIdsChange = new EventEmitter<number[]>();
+  @Input() public id!: string;
+  @Input() public label!: string;
+  @Input() public placeholder!: string;
+  @Input() public errorMessage!: string;
+  @Input() public includeOnlyIds!: number[];
+  @Input() public selectedIds: number[] = [];
+  @Output() public selectedIdsChange = new EventEmitter<number[]>();
 
   protected allElements: ElementCacheModel[] = [];
-  protected elements!: ElementCacheModel[];
+  protected elements: ElementCacheModel[] = [];
   protected selectedElements!: ElementCacheModel[];
+
   private destroy$ = new Subject<void>();
 
-  constructor(private elementsCacheSevice: ElementsCacheService) {
-    this.elementsCacheSevice.cachedElements.pipe(
+  constructor(private elementsCacheService: ElementsCacheService) {
+    this.elementsCacheService.cachedElements.pipe(
       takeUntil(this.destroy$),
     ).subscribe(data => {
       this.allElements = data;
@@ -56,7 +50,8 @@ export class ElementSelectorMultipleComponent implements OnChanges, OnDestroy {
   }
 
   private setElementsToInclude(): void {
-    this.elements = this.includeOnlyIds && this.includeOnlyIds.length > 0 ? this.allElements.filter(item => this.includeOnlyIds.includes(item.id)) : this.allElements;
+    this.elements = this.includeOnlyIds && this.includeOnlyIds.length > 0 ?
+      this.allElements.filter(item => this.includeOnlyIds.includes(item.id)) : [...this.allElements];
   }
 
   private filterBasedOnSelectedIds(): void {
@@ -89,19 +84,40 @@ export class ElementSelectorMultipleComponent implements OnChanges, OnDestroy {
   }
 
   /**
-   * Called from advanced search dialog
-   * @param searchedIds 
+   * Raised when advanced search input changes
+   * @param newSelectedIds 
    */
-  protected onAdvancedSearchInput(searchedIds: number[]): void {
-    this.selectedIds.length = 0;
-    const selectedElements: ElementCacheModel[] = []
-    for (const element of this.elements) {
-      if (searchedIds.includes(element.id)) {
-        this.selectedIds.push(element.id);
-        selectedElements.push(element);
+  protected onAdvancedSearchInput(newSelectedIds: number[]): void {
+    // Get the selected elements based on the new selected Ids
+    const newSelectedElements: ElementCacheModel[] = this.elements.filter(element => newSelectedIds.includes(element.id));
+
+    //----------------------------------------------------------------
+    // Sort selected elements to have the selectedIds as first items in the filtered options array
+    //----------------------------------------------------------------
+    // Create a map for quick lookups of the desired order.
+    const orderMap = new Map(newSelectedIds.map((idValue, index) => [idValue, index]));
+    newSelectedElements.sort((a, b) => {
+      const aInSelected = orderMap.has(a.id);
+      const bInSelected = orderMap.has(b.id);
+
+      // If both are in selectedIds, sort by their order in selectedIds
+      if (aInSelected && bInSelected) {
+        return orderMap.get(a.id)! - orderMap.get(b.id)!;
       }
-    }
-    this.selectedElements = selectedElements;
+      if (aInSelected) return -1; // a comes first
+      if (bInSelected) return 1;  // b comes first 
+      return 0;
+    });
+    //----------------------------------------------------------------
+
+
+    // Set the new selected elements and Ids
+    this.selectedElements = newSelectedElements;
+    //this.selectedIds = newSelectedIds;
+    this.selectedIds.length = 0;
+    this.selectedIds.push(...newSelectedIds);
+
+    // Emit the changes
     this.selectedIdsChange.emit(this.selectedIds);
   }
 }

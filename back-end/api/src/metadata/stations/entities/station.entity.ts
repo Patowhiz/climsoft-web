@@ -9,6 +9,7 @@ import { StationObservationFocusEntity } from "./station-observation-focus.entit
 @Entity("stations")
 @Check("CHK_stations_id_not_empty", `"id" <> ''`) // Not empty CHECK constraint
 @Check("CHK_stations_name_not_empty", `"name" <> ''`)// Not empty CHECK constraint
+@Check("CHK_stations_operational_no_close_date", `"status" <> 'operational' OR "date_closed" IS NULL`) // operational stations should not have a closed date
 export class StationEntity extends AppBaseEntity {
   @PrimaryColumn({ name: "id", type: 'varchar' })
   id: string;
@@ -20,9 +21,9 @@ export class StationEntity extends AppBaseEntity {
   @Column({ name: "description", type: 'varchar', nullable: true })
   description: string | null;
 
-  @Column({ name: "observation_processing_method", type: "enum", enum: StationObsProcessingMethodEnum })
+  @Column({ name: "observation_processing_method", type: "enum", enum: StationObsProcessingMethodEnum, nullable: true })
   @Index()
-  obsProcessingMethod: StationObsProcessingMethodEnum;
+  obsProcessingMethod: StationObsProcessingMethodEnum | null;
 
   // TODO. Create a separate table for station history. Important for tracking station movements
   // Reason as to why station location table is important when it comes to moving stations like aircrafts.
@@ -62,16 +63,32 @@ export class StationEntity extends AppBaseEntity {
   //---------------
 
   //---------------
-  @Column({ name: "organisation_id", type: "int", nullable: true })
+  //organisation that owns the station.
+  //---------------
+  @Column({ name: "owner_id", type: "int", nullable: true })
   @Index()
-  organisationId: number | null; // name of organisation that owns the station.
+  ownerId: number | null; // name of 
 
   @ManyToOne(() => OrganisationEntity, {
     nullable: true,
     onDelete: "SET NULL",
   })
-  @JoinColumn({ name: "organisation_id" })
-  organisation: OrganisationEntity | null;
+  @JoinColumn({ name: "owner_id" })
+  owner: OrganisationEntity | null;
+  //---------------
+  //---------------
+  //organisation that owns the station.
+  //---------------
+  @Column({ name: "operator_id", type: "int", nullable: true })
+  @Index()
+  operatorId: number | null; // name of 
+
+  @ManyToOne(() => OrganisationEntity, {
+    nullable: true,
+    onDelete: "SET NULL",
+  })
+  @JoinColumn({ name: "operator_id" })
+  operator: OrganisationEntity | null;
   //---------------
 
   @Column({ name: "wmo_id", type: 'varchar', nullable: true, unique: true })
@@ -100,7 +117,6 @@ export class StationEntity extends AppBaseEntity {
 
   @Column({ name: "log", type: 'jsonb', nullable: true })
   log: StationLogVo[] | null;
-
 }
 
 export interface StationLogVo extends BaseLogVo {

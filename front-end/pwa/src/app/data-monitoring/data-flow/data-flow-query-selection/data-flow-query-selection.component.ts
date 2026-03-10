@@ -1,11 +1,11 @@
 import { Component, EventEmitter, Input, OnDestroy, Output } from '@angular/core';
 import { Subject, takeUntil } from 'rxjs';
 import { AppAuthService } from 'src/app/app-auth.service';
-import { UserPermissionModel } from 'src/app/admin/users/models/user-permission.model';
+import { UserPermissionModel } from 'src/app/admin/users/models/permissions/user-permission.model';
 import { DateRange } from 'src/app/shared/controls/date-range-input/date-range-input.component';
 import { PagesDataService, ToastEventTypeEnum } from 'src/app/core/services/pages-data.service';
 import { DateUtils } from 'src/app/shared/utils/date.utils';
-import { GeneralSettingsService } from 'src/app/admin/general-settings/services/general-settings.service';
+import { GeneralSettingsCacheService } from 'src/app/admin/general-settings/services/general-settings.service';
 import { SettingIdEnum } from 'src/app/admin/general-settings/models/setting-id.enum';
 import { ClimsoftDisplayTimeZoneModel } from 'src/app/admin/general-settings/models/settings/climsoft-display-timezone.model';
 import { DataFlowQueryModel } from 'src/app/data-ingestion/models/data-flow-query.model';
@@ -33,7 +33,7 @@ export class DataFlowQuerySelectionComponent implements OnDestroy {
   constructor(
     private pagesDataService: PagesDataService,
     private appAuthService: AppAuthService,
-    private generalSettingsService: GeneralSettingsService,
+    private generalSettingsService: GeneralSettingsCacheService,
   ) {
 
     // Set default dates to 1 year
@@ -61,9 +61,7 @@ export class DataFlowQuerySelectionComponent implements OnDestroy {
     this.appAuthService.user.pipe(
       takeUntil(this.destroy$),
     ).subscribe(user => {
-      if (!user) {
-        throw new Error('User not logged in');
-      }
+      if (!user) return;
 
       if (user.isSystemAdmin) {
         this.includeOnlyStationIds = [];

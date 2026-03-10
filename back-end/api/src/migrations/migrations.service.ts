@@ -9,12 +9,17 @@ import { StationObsEnvService } from 'src/metadata/stations/services/station-obs
 import { StationObsFocusesService } from 'src/metadata/stations/services/station-obs-focuses.service';
 import { MetadataDefaults } from './metadata-defaults';
 import { GeneralSettingsService } from 'src/settings/services/general-settings.service';
-import { GeneralSettingsDefaults } from './general-settings-defaults';
+import { DEFAULT_GENERAL_SETTINGS } from './general-settings-defaults';
 import { SqlScriptsLoaderService } from 'src/sql-scripts/sql-scripts-loader.service';
+import { QCSpecificationsService } from 'src/metadata/qc-specifications/services/qc-specifications.service';
+import { QCTestTypeEnum } from 'src/metadata/qc-specifications/entities/qc-test-type.enum';
+import { RangeThresholdQCTestParamsDto } from 'src/metadata/qc-specifications/dtos/qc-test-parameters/range-qc-test-params.dto';
+import { GeneralSettingParameters } from 'src/settings/dtos/update-general-setting-params.dto';
+import { ViewGeneralSettingModel } from 'src/settings/dtos/view-general-setting.model';
 
 @Injectable()
 export class MigrationsService {
-  private readonly SUPPORTED_DB_VERSION: string = "0.0.3"; // TODO. Should come from a versioning file. 
+  private readonly SUPPORTED_DB_VERSION: string = '0.0.4'; // TODO. Should come from a versioning file. 
   private readonly logger = new Logger(MigrationsService.name);
 
   constructor(
@@ -25,7 +30,10 @@ export class MigrationsService {
     private elementTypesService: ElementTypesService,
     private stationObsEnvService: StationObsEnvService,
     private stationObsFocusesService: StationObsFocusesService,
-    private generalSettingsService: GeneralSettingsService) { }
+    private generalSettingsService: GeneralSettingsService,
+    private qcTestsService: QCSpecificationsService, // TODO. Temporary. After all met services have version preview 2.0.5. Remove this. New installations won't need it
+
+  ) { }
 
   public async doMigrations() {
     // Get last db version
@@ -48,6 +56,9 @@ export class MigrationsService {
 
     // Depending on the version the seeding will be different
     await this.seedDatabase();
+
+    // TODO. Temporary solution for preview 1 to 2.0.3 installations. Once all met services have preview 2.0.5 remove this
+    this.changeUpperAndLowerLimitQCStructure();
 
     // After successful migrations, then add the new database version
     const newDBVersion = this.dbVersionRepo.create({
@@ -84,7 +95,7 @@ export class MigrationsService {
     await this.sqlScriptsService.addEntryDatetimeTriggerToDB();
     await this.sqlScriptsService.addLogsTriggersToDB();
     await this.sqlScriptsService.addQCTestsFunctionsToDB();
-     await this.sqlScriptsService.addDataAvailabilityFunctionsToDB();
+    await this.sqlScriptsService.addDataAvailabilityFunctionsToDB();
   }
 
   private async seedFirstUser() {
@@ -140,11 +151,37 @@ export class MigrationsService {
   }
 
   private async seedGeneralSettings() {
-    // Default general settings
-    const count: number = await this.generalSettingsService.count();
-    if (count === 0) {
-      await this.generalSettingsService.bulkPut(GeneralSettingsDefaults.GENERAL_SETTINGS, 1);
-      this.logger.log('general settings added');
+    const existingSettings = this.generalSettingsService.findAll();
+
+    for (const defaultSetting of DEFAULT_GENERAL_SETTINGS) {
+      //If any of the default settings do not exist in the server then add it. This is to make sure that new default settings added in the code will be added to existing installations after migration.
+      const existingSetting = existingSettings.find(s => s.id === defaultSetting.id);
+      const params: GeneralSettingParameters = existingSetting ? existingSetting.parameters : defaultSetting.parameters;
+      await this.generalSettingsService.put(defaultSetting.id, defaultSetting.name, defaultSetting.description, params, 1);
+    }
+
+
+    this.logger.log(`All general settings updated`);
+  }
+
+  // TODO. Temporary function to upgrade preview 2.0.4 and below releases
+  private async changeUpperAndLowerLimitQCStructure() {
+    const rangeQcs = await this.qcTestsService.findQCTestByType(QCTestTypeEnum.RANGE_THRESHOLD);
+
+    for (const qc of rangeQcs) {
+      const oldThresholdParams: any = qc.parameters;
+      if (oldThresholdParams.lowerThreshold !== undefined && oldThresholdParams.upperThreshold !== undefined) {
+        const newThresholdParams: RangeThresholdQCTestParamsDto = {
+          allRangeThreshold: {
+            lowerThreshold: oldThresholdParams.lowerThreshold,
+            upperThreshold: oldThresholdParams.upperThreshold
+          }
+        };
+
+        await this.qcTestsService.update(qc.id, { ...qc, parameters: newThresholdParams }, 1);
+
+        this.logger.log(`Range threshold updated -  ${qc.id} - ${qc.name}`)
+      }
     }
   }
 

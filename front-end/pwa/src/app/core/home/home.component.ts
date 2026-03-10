@@ -1,6 +1,6 @@
 import { Component, OnDestroy, OnInit } from '@angular/core';
 import { ViewPortSize, ViewportService } from 'src/app/core/services/view-port.service';
-import { NetworkStatusTypeEnum, PagesDataService, ToastEvent } from '../services/pages-data.service';
+import { NetworkStatusTypeEnum, PagesDataService, ToastEvent, ToastEventTypeEnum } from '../services/pages-data.service';
 import { Subject, take, takeUntil } from 'rxjs';
 import { AppAuthService } from '../../app-auth.service';
 import { ObservationsService } from 'src/app/data-ingestion/services/observations.service';
@@ -14,13 +14,14 @@ import { MainMenuNameEnum, MenuItem, MenuItemsUtil, SubMenuNameEnum } from './me
 })
 export class HomeComponent implements OnInit, OnDestroy {
   protected featuresNavItems: MenuItem[] = [];
-  protected bOpenSideNav: boolean = false;
+  protected openSideNav: boolean = false;
   protected pageHeaderName: string = '';
   protected toasts: ToastEvent[] = [];
   protected unsyncedObservations: string = '';
   protected displayUserDropDown: boolean = false;
   protected user!: LoggedInUserModel;
   protected appIsOffline: boolean = false;
+  private viewPortSize!: ViewPortSize;
 
   private destroy$ = new Subject<void>();
 
@@ -43,8 +44,11 @@ export class HomeComponent implements OnInit, OnDestroy {
     });
 
     // Subscribe to the app view port size changes
-    this.appViewPortService.viewPortSize.subscribe((viewPortSize) => {
-      this.bOpenSideNav = viewPortSize === ViewPortSize.LARGE;
+    this.appViewPortService.viewPortSize.pipe(
+      takeUntil(this.destroy$),
+    ).subscribe((viewPortSize) => {
+      this.viewPortSize = viewPortSize;
+      this.openSideNav = this.viewPortSize === ViewPortSize.LARGE;
     });
 
     // Subscribe to the oage header changes
@@ -98,6 +102,16 @@ export class HomeComponent implements OnInit, OnDestroy {
     this.destroy$.complete();
   }
 
+  protected onMenuItemClick(menuItem: MenuItem): void {
+    if (menuItem.url && this.viewPortSize === ViewPortSize.SMALL) {
+      this.openSideNav = false;
+    }
+  }
+
+  protected closeUserDropDown(): void {
+    this.displayUserDropDown = false;
+  }
+
   protected logOut(): void {
     this.appAuthService.logout().pipe(take(1)).subscribe(data => {
       this.appAuthService.removeUser();
@@ -107,15 +121,14 @@ export class HomeComponent implements OnInit, OnDestroy {
     });
   }
 
-  private showToast(currentToast: ToastEvent) {
-    this.toasts.push(currentToast);
-    // automatically hide the toast after 3 seconds
+  private showToast(newToast: ToastEvent) {
+    this.toasts.push(newToast);
     setTimeout(() => {
-      if (this.toasts.length > 0) {
-        //remove the first
-        this.toasts.splice(0, 1);
+      const index: number = this.toasts.findIndex(toast => toast === newToast);
+      if (index !== 1) {
+        this.toasts.splice(index, 1);
       }
-    }, 3000);
+    }, newToast.timeout ? newToast.timeout : 3000);
   }
 
   protected syncObservations() {
@@ -149,7 +162,7 @@ export class HomeComponent implements OnInit, OnDestroy {
     const dataIngestionMenuItems: MenuItem = MenuItemsUtil.DATA_INGESTION_MENU_ITEMS;
     // Remove system admin data ingestion sub-modules
     dataIngestionMenuItems.children = dataIngestionMenuItems.children.filter(item =>
-      item.name !== SubMenuNameEnum.SCHEDULED_IMPORT &&
+      //item.name !== SubMenuNameEnum.SCHEDULED_IMPORT &&
       item.name !== SubMenuNameEnum.DELETED_DATA
     );
 
@@ -162,7 +175,7 @@ export class HomeComponent implements OnInit, OnDestroy {
       );
     } else {
       // If no import permissions then remove manual import sub-modules
-      if (!user.permissions.entryPermissions.importPermissions) {
+      if (!user.permissions.importPermissions) {
         dataIngestionMenuItems.children = dataIngestionMenuItems.children.filter(item =>
           item.name !== SubMenuNameEnum.MANUAL_IMPORT
         );
@@ -184,7 +197,7 @@ export class HomeComponent implements OnInit, OnDestroy {
     // If there is qc permissions then remove scheduled qc because it's for admin only.
     if (user.permissions.qcPermissions) {
       const qcMenuItems: MenuItem = MenuItemsUtil.QUALITY_CONTROL_MENU_ITEMS;
-      qcMenuItems.children = qcMenuItems.children.filter(item => item.name !== SubMenuNameEnum.SCHEDULED_QC_TESTS);
+      //qcMenuItems.children = qcMenuItems.children.filter(item => item.name !== SubMenuNameEnum.SCHEDULED_QC_TESTS);
       this.featuresNavItems.push(qcMenuItems);
     }
     //-------------------------------------------
@@ -193,7 +206,7 @@ export class HomeComponent implements OnInit, OnDestroy {
     // If there is export permissions then remove scheduled exports because it's for admin only.
     if (user.permissions.exportPermissions) {
       const dataExtractionMenuItems: MenuItem = MenuItemsUtil.DATA_EXTRACTION_MENU_ITEMS;
-      dataExtractionMenuItems.children = dataExtractionMenuItems.children.filter(item => item.name !== SubMenuNameEnum.SCHEDULED_EXPORT);
+      //dataExtractionMenuItems.children = dataExtractionMenuItems.children.filter(item => item.name !== SubMenuNameEnum.SCHEDULED_EXPORT);
       this.featuresNavItems.push(dataExtractionMenuItems);
     }
     //-------------------------------------------
@@ -202,12 +215,13 @@ export class HomeComponent implements OnInit, OnDestroy {
     // Remove admin related metadata
     const metadataMenuItems: MenuItem = MenuItemsUtil.METADATA_MENU_ITEMS;
     metadataMenuItems.children = metadataMenuItems.children.filter(item =>
-      item.name !== SubMenuNameEnum.SOURCE_TEMPLATES
-      && item.name !== SubMenuNameEnum.EXPORT_TEMPLATES
-      && item.name !== SubMenuNameEnum.INTEGRATION_CONNECTORS
+      item.name !== SubMenuNameEnum.SOURCE_SPECIFICATIONS
+      && item.name !== SubMenuNameEnum.EXPORT_SPECIFICATIONS
+      && item.name !== SubMenuNameEnum.CONNECTOR_SPECIFICATIONS
       && item.name !== SubMenuNameEnum.ORGANISATIONS
       && item.name !== SubMenuNameEnum.NETWORK_AFFILIATIONS
       && item.name !== SubMenuNameEnum.REGIONS
+      && item.name !== SubMenuNameEnum.QC_SPECIFICATIONS
     );
 
     this.featuresNavItems.push(metadataMenuItems);

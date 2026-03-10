@@ -4,7 +4,7 @@ import { QCStatusEnum } from "../enums/qc-status.enum";
 import { AppBaseEntity, BaseLogVo } from "src/shared/entity/app-base-entity";
 import { StationEntity } from "src/metadata/stations/entities/station.entity";
 import { ElementEntity } from "src/metadata/elements/entities/element.entity";
-import { SourceTemplateEntity } from "src/metadata/source-templates/entities/source-template.entity";
+import { SourceSpecificationEntity } from "src/metadata/source-specifications/entities/source-specification.entity";
 
 // TODO. Investigate if a constraints check for interval to always be greater than 0 is necessary
 @Entity("observations")
@@ -50,12 +50,13 @@ export class ObservationEntity extends AppBaseEntity {
   @Index()
   sourceId: number;
 
-  @ManyToOne(() => SourceTemplateEntity, { onDelete: "RESTRICT" })
+  @ManyToOne(() => SourceSpecificationEntity, { onDelete: "RESTRICT" })
   @JoinColumn({ name: "source_id" })
-  source: SourceTemplateEntity;
+  source: SourceSpecificationEntity;
   //------------------
 
-  @Column({ name: "value", type: "float", nullable: true })
+  // Note, as of 14/01/2026, TypeORM `float` translates to Postgres `DOUBLE PRECISION`. Used `float` here because TYPEORM does not support `double`
+  @Column({ name: "value", type: "float", nullable: true }) 
   value: number | null;
 
   @Column({ name: "flag", type: "enum", enum: FlagEnum, nullable: true })

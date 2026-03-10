@@ -18,19 +18,16 @@ body {
     // background-color: #f5f7fb
 }
 
-
-
-// TODO. Deprecate in favour of app-cursor-pointer
-.cursor-pointer {
-    cursor: pointer;
-}
-
 .app-cursor-pointer {
     cursor: pointer;
 }
 
+.app-cursor-drag {
+    cursor: grab;
+}
+
 .app-table-container {
-    height: 60vh; // This should be overwritten depending on the component number of controls
+    max-height: 60vh; // Components can overwrite this with [style.max-height]
     overflow: auto;
 }
 
@@ -48,6 +45,30 @@ body {
     border-top-color: #ddd;
 }
 
+.app-sortable-header {
+    cursor: pointer;
+    -webkit-user-select: none;
+    user-select: none;
+    transition: background-color 0.15s;
+
+    .sort-preview {
+        display: none;
+        opacity: 0.35;
+    }
+
+    &:hover {
+        background-color: rgba(0, 0, 0, 0.075);
+
+        .sort-active {
+            display: none;
+        }
+
+        .sort-preview {
+            display: inline;
+        }
+    }
+}
+
 .app-value-flag-container {
     //max-width: 6.875rem; // 110px
     max-width: 7.8125rem; // 125px
@@ -55,6 +76,13 @@ body {
     //max-width: 8.125rem; // 130px
     //max-width: 120px; // 120px  
     font-size: 12px;
+}
+
+// Move this to Text Input Component?
+.app-label-super-script {
+  vertical-align: super;
+  font-size: 0.6875rem; // 10px 
+  margin-left: 1px;
 }
 
 .app-station-monitoring-stats {

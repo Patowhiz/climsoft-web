@@ -58,17 +58,25 @@ export class ClimsoftV4Controller {
 
   @Admin()
   @Post('import-elements')
-  async pullElements(@Req() request: Request) {
+  async importElements(@Req() request: Request) {
     const saved: boolean = await this.climsoftV4WebSetUpService.saveV4ElementsToV5DB(AuthUtil.getLoggedInUserId(request));
     return { message: saved ? 'success' : 'error' };
   }
 
   @Admin()
   @Post('import-stations')
-  async pullStations(@Req() request: Request) {
+  async importStations(@Req() request: Request) {
     const saved: boolean = await this.climsoftV4WebSetUpService.saveV4StationsToV5DB(AuthUtil.getLoggedInUserId(request));
     return { message: saved ? 'success' : 'error' };
   }
+
+  @Admin()
+  @Post('import-element-qcs')
+  async importElementQC(@Req() request: Request) {
+    const saved: boolean = await this.climsoftV4WebSetUpService.saveV4QCsToV5DB(AuthUtil.getLoggedInUserId(request));
+    return { message: saved ? 'success' : 'error' };
+  }
+
 
   @Admin()
   @Post('save-observations')

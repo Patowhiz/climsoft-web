@@ -1,13 +1,12 @@
-import { Body, Controller, Delete, FileTypeValidator, Get, Header, MaxFileSizeValidator, Param, ParseFilePipe, Patch, Post, Put, Query, Req, UploadedFile, UseInterceptors } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Header, Param, Patch, Post, Put, Query, Req } from '@nestjs/common';
 import { StationsService } from '../services/stations.service';
 import { AuthorisedStationsPipe } from 'src/user/pipes/authorised-stations.pipe';
 import { UpdateStationDto } from '../dtos/update-station.dto';
-import { CreateStationDto } from '../dtos/create-update-station.dto';
+import { CreateStationDto } from '../dtos/create-station.dto';
 import { ViewStationQueryDTO } from '../dtos/view-station-query.dto';
 import { Admin } from 'src/user/decorators/admin.decorator';
 import { AuthUtil } from 'src/user/services/auth.util';
 import { Request } from 'express';
-import { FileInterceptor } from '@nestjs/platform-express';
 import { StationsImportExportService } from '../services/stations-import-export.service';
 import { FileIOService } from 'src/shared/services/file-io.service';
 
@@ -21,13 +20,13 @@ export class StationsController {
 
   @Get()
   find(
-    @Query() viewQueryDto: ViewStationQueryDTO): Promise<CreateStationDto[]> {
+    @Query() viewQueryDto: ViewStationQueryDTO): CreateStationDto[] {
     return this.stationsService.find(viewQueryDto);
   }
 
   @Get('id/:id')
   findOne(
-    @Param('id') id: string): Promise<CreateStationDto> {
+    @Param('id') id: string): CreateStationDto {
     return this.stationsService.findOne(id);
   }
 
@@ -51,31 +50,19 @@ export class StationsController {
   }
 
   @Admin()
+  @Put('bulk')
+  async bulkPut(
+    @Req() request: Request,
+    @Body() items: CreateStationDto[]): Promise<void> {
+    await this.stationsService.bulkPut(items, AuthUtil.getLoggedInUserId(request));
+  }
+
+  @Admin()
   @Post()
   async add(
     @Req() request: Request,
     @Body() item: CreateStationDto): Promise<CreateStationDto> {
     return this.stationsService.add(item, AuthUtil.getLoggedInUserId(request));
-  }
-
-  @Admin()
-  @Put('upload')
-  @UseInterceptors(FileInterceptor('file'))
-  async import(
-    @Req() request: Request,
-    @UploadedFile(new ParseFilePipe({
-      validators: [
-        new MaxFileSizeValidator({ maxSize: 1024 * 1024 * 1 }), // 1MB. 
-        new FileTypeValidator({ fileType: 'text/csv' }),
-      ]
-    })
-    ) file: Express.Multer.File) {
-    try {
-      await this.stationImportExportService.import(file, AuthUtil.getLoggedInUserId(request));
-      return { message: "success" };
-    } catch (error) {
-      return { message: `error: ${error}` };
-    }
   }
 
   @Patch(':id')
